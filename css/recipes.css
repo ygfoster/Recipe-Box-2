@@ -290,6 +290,15 @@
 .photo-remove { position: absolute; right: 10px; bottom: 10px; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; background: rgba(0,0,0,.6); color: #fff; }
 .picks { display: flex; flex-wrap: wrap; gap: 8px; }
 .picks-empty { font-size: 13px; color: var(--ink-2); }
+/* 動画URL欄の右上:YouTube / Instagram を開くアイコン。欄にその動画が入っていると(.has)少し持ち上がる */
+.video-lbl { align-items: center; margin-bottom: 8px; }
+.video-lbl .lbl { margin-bottom: 0; }
+.video-apps { display: inline-flex; gap: 6px; }
+.app-link { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--sunken); transition: transform .3s var(--spring), background .2s, box-shadow .2s; }
+.app-link svg { width: 20px; height: 20px; }
+.app-link:hover { background: var(--fill); }
+.app-link:active { transform: scale(.88); }
+.app-link.has { background: var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,.12), 0 0 0 .5px rgba(0,0,0,.06); }
 .video-prev { display: flex; align-items: center; gap: 12px; margin-top: 8px; padding: 8px; border-radius: var(--r-input); background: var(--sunken); animation: rise .5s var(--ease) both; }
 .vp-thumb { position: relative; width: 96px; aspect-ratio: 16 / 9; border-radius: 9px; overflow: hidden; flex: none; background: var(--fill); display: grid; place-items: center; font-size: 22px; }
 .vp-thumb img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .4s; }

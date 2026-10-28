@@ -10,6 +10,8 @@ import { compressImage, makeImg } from './lib/image.js';
 import { openSettings } from './settings.js';
 import { currentFilter, revealList } from './recipes.js';
 
+const ICON_YT = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="4.5" fill="#FF0033"/><path d="M10 9v6l5-3z" fill="#fff"/></svg>';
+const ICON_IG = '<svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="igg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FFD600"/><stop offset=".5" stop-color="#FF0169"/><stop offset="1" stop-color="#7638FA"/></linearGradient></defs><rect x="3" y="3" width="18" height="18" rx="5" fill="url(#igg)"/><circle cx="12" cy="12" r="4" fill="none" stroke="#fff" stroke-width="1.8"/><circle cx="17" cy="7" r="1.2" fill="#fff"/></svg>';
 const CAMERA = '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 016.5 6h1.2l1.1-1.6A1.5 1.5 0 0110 3.7h4a1.5 1.5 0 011.2.7L16.3 6h1.2A2.5 2.5 0 0120 8.5v8a2.5 2.5 0 01-2.5 2.5h-11A2.5 2.5 0 014 16.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="12.5" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
 
 let ov;
@@ -45,6 +47,29 @@ function textarea(rows, placeholder) {
   t.rows = rows;
   t.placeholder = placeholder;
   return t;
+}
+// ラベルの右に置く「YouTube / Instagram を開く」アイコン。欄にそのサービスの URL が入っていればその動画を、無ければトップを開く
+const APPS = {
+  youtube: { name: 'YouTube', home: 'https://www.youtube.com/', icon: ICON_YT },
+  instagram: { name: 'Instagram', home: 'https://www.instagram.com/', icon: ICON_IG },
+};
+function appLink(key) {
+  const a = el('a', 'app-link');
+  a.dataset.app = key;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  a.innerHTML = APPS[key].icon;
+  return a;
+}
+function paintAppLinks(v) {
+  F.videoApps.querySelectorAll('.app-link').forEach((a) => {
+    const app = APPS[a.dataset.app];
+    const mine = v && (a.dataset.app === 'youtube' ? v.type === 'youtube' : v.type === 'link' && v.label === app.name);
+    a.href = mine ? v.url : app.home;
+    a.setAttribute('aria-label', mine ? `この動画を ${app.name} で開く` : `${app.name} を開く`);
+    a.title = a.getAttribute('aria-label');
+    a.classList.toggle('has', !!mine);
+  });
 }
 // ジャンル・種類の選択(「編集」で設定へ)
 function pickField(labelText, kind) {
@@ -89,6 +114,13 @@ function build(body, o) {
   // 参考動画
   F.video = input('url', { inputMode: 'url', autocomplete: 'off', placeholder: 'YouTube・Instagram・TikTok などのURL' });
   const videoField = field('参考動画のURL', F.video, 'rf-video');
+  // ラベルの右に YouTube / Instagram を開くアイコン(動画を探しに行って、URL をコピーして戻ってこられる)
+  const videoRow = el('div', 'lbl-row video-lbl');
+  F.videoApps = el('span', 'video-apps');
+  F.videoApps.append(appLink('youtube'), appLink('instagram'));
+  videoField.firstChild.classList.add('lbl');
+  videoRow.append(videoField.firstChild, F.videoApps);
+  videoField.prepend(videoRow);
   F.videoPrev = el('div', 'video-prev');
   F.videoPrev.hidden = true;
   videoField.append(F.videoPrev);
@@ -199,6 +231,7 @@ function renderVideoPreview(autofill) {
   const box = F.videoPrev;
   const val = F.video.value.trim();
   const v = videoInfo(val);
+  paintAppLinks(v);
   box.className = 'video-prev';
   box.innerHTML = '';
   if (!val) { box.hidden = true; return; }

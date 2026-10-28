@@ -332,7 +332,7 @@ YouTube の埋め込みは `https://www.youtube.com/embed/{id}?autoplay=1&playsi
 |---|---|---|
 | `recipes.js` | `init()` | ホーム(`#view-recipes`)の一覧・検索・絞り込み。カードを押したら `openDetail(id, { origin })`。「食材から探す」→ `openFridge(origin)`。0件のときの「レシピを追加」→ `openForm()`。ほかのモジュール向けに `currentFilter()`→`{ genre, course }`(登録画面の初期値)、`setQuery(text)`(詳細のタグから `#タグ` で検索)、`revealList()`(保存直後に一覧の先頭までスクロール)も export する |
 | `recipe-detail.js` | `init()`、`openDetail(id, { servings?, origin? })` | `servings` を渡すとその人数で開く(今日の献立・献立の1品から)。「献立に追加」→ `openSlotPicker(id, servings, origin)`、「調理モード」→ `openCook(id, servings)`、編集 → `openForm(id)`、動画 → `openPip(recipe, t, origin)`、タイマー → `startTimer(sec, label)`。手順のチップ `stepChips(recipe, step, inCook)` も export し、cook.js が共用する |
-| `recipe-form.js` | `init()`、`openForm(id = null, preset = {})` | `preset = { name?, videoUrl?, memo? }`(共有メニューから。app.js が 'share' で呼ぶ)。ジャンル/種類の「編集」→ `openSettings('genres'|'courses', origin)` |
+| `recipe-form.js` | `init()`、`openForm(id = null, preset = {})` | `preset = { name?, videoUrl?, memo? }`(共有メニューから。app.js が 'share' で呼ぶ)。動画URL欄のラベル右に YouTube / Instagram を開くアイコン(欄にその動画が入っていればその動画を開く)。ジャンル/種類の「編集」→ `openSettings('genres'|'courses', origin)` |
 | `cook.js` | `init()`、`openCook(id, servings)` | 調理モードのページ。Wake Lock は `onClose` で解放 |
 | `timers.js` | `init()`、`startTimer(sec, label)` | `#timers` に表示。複数同時 |
 | `pip.js` | `init()`、`openPip(recipe, t = 0, origin?)`、`closePip()` | `#pip` に小窓。同じ動画なら頭出しだけ。2本指のピンチ(トラックパッドは ctrl+ホイール)で大きさを変えられ、小・大それぞれの幅を `rb2:pipSize` に保存 |
