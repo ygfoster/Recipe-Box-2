@@ -44,7 +44,7 @@ const S = {
   sync: { state: 'local', error: '' },
   fromCache: true, pending: false,
 };
-let unsubAuth = null, unsubBoxes = null, unsubBox = [];
+let unsubAuth = null, unsubBoxes = null, unsubAi = null, unsubBox = [];
 
 // settings はデータの入れ物そのもの(store.settings.genres …)。save はメソッドだが列挙されない
 const settings = {};
@@ -56,6 +56,33 @@ function applySettings(next) {
   Object.assign(settings, next);
   if (changed) ev.emit('settings', settings);
   refreshBoxNames();
+}
+
+// AI(Gemini)の設定。自分のアカウントのもの(ボックスを切り替えても変わらない)。store.ai.key / store.ai.model
+const ai = { key: '', model: '' };
+Object.defineProperty(ai, 'save', { value: (next) => saveAi(next), enumerable: false });
+const normalizeAi = (d) => ({ key: String((d && d.key) || '').trim(), model: String((d && d.model) || '').trim() });
+function applyAi(next) {
+  const n = normalizeAi(next);
+  const changed = n.key !== ai.key || n.model !== ai.model;
+  Object.assign(ai, n);
+  if (changed) ev.emit('ai', ai);
+}
+async function saveAi(next) {
+  const n = normalizeAi({ ...ai, ...(next || {}) });
+  applyAi(n);
+  if (S.mode !== 'cloud') { prefs.set('ai', n); return true; }
+  cloudWrite(S.cloud.putAi(S.user.uid, n));
+  evalSync(true);
+  return true;
+}
+// ほかの端末で入れたキーを反映。まだクラウドに無ければ、この端末のものを送る
+function onAiSnap(data) {
+  if (data) return applyAi(data);
+  const local = normalizeAi(prefs.get('ai', null));
+  if (!local.key && !local.model) return;
+  applyAi(local);
+  cloudWrite(S.cloud.putAi(S.user.uid, local));
 }
 
 const getRecipe = (id) => S.recipes.find((r) => r.id === id);
@@ -190,6 +217,7 @@ async function loadLocal() {
   ev.emit('box', S.box);
   ev.emit('boxes', S.boxes);
   applySettings(normalizeSettings(prefs.get('settings', null)));
+  applyAi(prefs.get('ai', null));
   try {
     const raw = await db.all('recipes');
     S.recipes = [];
@@ -240,6 +268,7 @@ function unsubscribeBox() { unsubBox.forEach((u) => u()); unsubBox = []; S.subsc
 function onAuth(user) {
   unsubscribeBox();
   if (unsubBoxes) { unsubBoxes(); unsubBoxes = null; }
+  if (unsubAi) { unsubAi(); unsubAi = null; }
   S.user = user;
   clearData();
   if (user) {
@@ -256,6 +285,7 @@ function onAuth(user) {
     setSync('syncing');
     migrateLocal(user);
     unsubBoxes = S.cloud.watchBoxes(user.uid, onBoxes, (e) => onCloudError(user.uid, e));
+    unsubAi = S.cloud.watchAi(user.uid, onAiSnap, (e) => onCloudError(user.uid, e));
   } else {
     S.mode = 'local';
     // ログアウト直後はゲートの後ろにクラウドのボックス名が残らないよう、この端末だけの状態に戻しておく
@@ -474,6 +504,7 @@ export const store = {
   get members() { return S.members; },
   get sync() { return S.sync; },
   settings,
+  ai,
 
   recipes: {
     get list() { return S.recipes; },

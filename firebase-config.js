@@ -2,10 +2,8 @@
 // Google Cloud で「ウェブサイトの制限(ygfoster.github.io)」と「YouTube Data API v3 のみ」を設定したキーを入れる。
 window.RB2_YOUTUBE_API_KEY = null;
 
-// Gemini の API キー(動画の中身を AI で読み取って材料・作り方を作る)。null なら AI の読み取りは出ない。
-// Google AI Studio で作り、Google Cloud で「ウェブサイトの制限(ygfoster.github.io)」と「Generative Language API のみ」を設定したキーを入れる。
-window.RB2_GEMINI_API_KEY = null;
-window.RB2_GEMINI_MODEL = 'gemini-3.1-flash-lite';
+// Gemini(AI で動画を読み取る)のキーはここには置かない。設定画面の「AI で動画を読み取る」から入れると、
+// 自分のアカウントのデータ(users/{uid}/meta/ai)として保存され、ほかの端末でも使える。
 
 // Firebase コンソールの「プロジェクトの設定 → マイアプリ」にある firebaseConfig(v1 と同じプロジェクト)。
 // null にすると、同期なし(この端末だけに保存)で動く。

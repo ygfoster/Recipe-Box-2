@@ -257,6 +257,12 @@ function renderVideoPreview(autofill) {
     if (hasAi()) {
       const auto = autofill && !fromDescription && !F.ing.value.trim() && !F.steps.value.trim();
       mountAi(text, v, t || '', seq, auto);
+    } else if (!fromDescription) {
+      // キー未設定:設定へ誘導
+      const b = el('button', 'link small vp-apply', 'AI で動画から材料・作り方を読み取る(設定が必要)');
+      b.type = 'button';
+      b.onclick = () => openSettings('ai', b);
+      text.append(b);
     }
   });
 }
@@ -278,10 +284,16 @@ function mountAi(text, v, title, seq, auto) {
     aiAbort = new AbortController();
     box.innerHTML = '';
     const st = el('span', 'ai-status');
-    st.innerHTML = '<span class="ai-dots" aria-hidden="true"><i></i><i></i><i></i></span>AI が動画を読み取っています(10〜40秒)…';
+    const sec = el('b');
+    st.innerHTML = '<span class="ai-dots" aria-hidden="true"><i></i><i></i><i></i></span>';
+    st.append('AI が動画を読み取っています… ', sec, el('span', 'ai-note', '(短い動画で30秒ほど。15分の動画だと3〜4分)'));
+    // 経過秒数(長い動画でも止まっていないと分かるように)
+    const t0 = Date.now();
+    const tick = setInterval(() => { sec.textContent = `${Math.round((Date.now() - t0) / 1000)}秒`; }, 1000);
     box.append(st);
     try {
       const r = await extractRecipeFromVideo({ url: v.url, title }, { signal: aiAbort.signal });
+      clearInterval(tick);
       if (seq !== videoSeq) return;
       box.innerHTML = '';
       const again = el('button', 'link small', '読み取り結果をもう一度見る');
@@ -290,6 +302,7 @@ function mountAi(text, v, title, seq, auto) {
       box.append(el('span', 'ai-done', '読み取れました'), again);
       openAiPreview(r);
     } catch (e) {
+      clearInterval(tick);
       if (seq !== videoSeq || (e && e.code === 'timeout' && aiAbort && aiAbort.signal.aborted && !ui.isOpen(ov))) return;
       box.innerHTML = '';
       box.append(el('span', 'ai-error', aiErrorText(e)));

@@ -62,3 +62,16 @@
 @media (max-width: 640px) {
   .trash-item .btn.small { padding: 7px 10px; }
 }
+
+/* AI で動画を読み取る */
+.ai-steps-list { list-style: decimal; margin: -12px 0 0 2px; padding-left: 22px; font-size: 14px; line-height: 1.7; color: var(--ink-2); }
+.ai-form { display: grid; gap: 16px; }
+.ai-form .field { margin-top: 0; }
+.ai-key-row { display: flex; gap: 8px; align-items: stretch; }
+.ai-key-row input { flex: 1; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+.ai-key-row .btn { flex: none; }
+.ai-adv summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink-2); padding: 4px 2px; }
+.ai-adv[open] summary { margin-bottom: 8px; }
+.ai-result { margin: 0 2px; font-size: 13px; }
+.ai-result.ok { color: var(--success); }
+.ai-result.bad { color: var(--danger); }

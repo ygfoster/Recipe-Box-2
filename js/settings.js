@@ -5,11 +5,12 @@ import * as ui from './ui.js';
 import { el, todayStr } from './lib/text.js';
 import { ingKey, effectiveStaples } from './lib/ingredients.js';
 import { heroImage } from './lib/image.js';
+import { testAiKey, aiErrorText, DEFAULT_MODELS } from './lib/ai.js';
 import { buildBoxPanel, paintAvatar } from './sharing.js';
 
 const TITLES = {
   main: '設定', account: '同期とアカウント', box: 'ボックスと共有', genres: 'ジャンル', courses: '種類',
-  staples: 'よく使う食材', meals: '献立で使う食事', trash: 'ゴミ箱', app: 'アプリ',
+  staples: 'よく使う食材', meals: '献立で使う食事', trash: 'ゴミ箱', app: 'アプリ', ai: 'AI で動画を読み取る',
 };
 // 選択肢の編集(ジャンル・種類・よく使う食材)
 const EDITORS = {
@@ -88,6 +89,14 @@ function build(body) {
         </ul>
       </section>
       <section class="sec">
+        <h3 class="sec-h">AI</h3>
+        <ul class="nav-list"><li><button type="button" data-to="ai">
+          <span class="nl-text"><span class="nl-title">AI で動画を読み取る</span><span class="nl-sub">YouTube から材料・作り方を自動で下書き</span></span>
+          <span class="nl-value" data-sum="ai"></span>
+          ${CHEV}
+        </button></li></ul>
+      </section>
+      <section class="sec">
         <h3 class="sec-h">アプリ</h3>
         <ul class="nav-list"><li><button type="button" data-to="app">
           <span class="nl-text wide"><span class="nl-title">ホーム画面に追加・バックアップ</span></span>
@@ -139,6 +148,35 @@ function build(body) {
       <button class="btn ghost danger wide" type="button" data-trash-clear hidden>ゴミ箱を空にする</button>
     </div>
 
+    <div class="set-page" data-page="ai" hidden>
+      <p class="hint">レシピの登録で YouTube の URL を貼ると、Gemini(Google の AI)が動画の中身を読んで、料理名・材料・作り方を下書きします。使うには Google の API キーが必要です(無料枠で使えます)。</p>
+      <ol class="ai-steps-list">
+        <li><a class="link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> を開き、「API キーを作成」で作る</li>
+        <li>できたキーをコピーして、下に貼る</li>
+      </ol>
+      <form class="ai-form" novalidate>
+        <div class="field">
+          <label for="ai-key">API キー</label>
+          <div class="ai-key-row">
+            <input id="ai-key" type="password" autocomplete="off" spellcheck="false" placeholder="AQ.… または AIza…" aria-label="API キー">
+            <button class="btn small" type="button" data-ai-show aria-pressed="false">表示</button>
+          </div>
+          <p class="hint">キーは自分のアカウントに保存され、ほかの端末でも使えます。家族や友だちには共有されません。</p>
+        </div>
+        <details class="ai-adv">
+          <summary>使うモデル(ふだんは変えなくてよい)</summary>
+          <div class="field">
+            <input id="ai-model" type="text" autocomplete="off" spellcheck="false" placeholder="${DEFAULT_MODELS}" aria-label="モデル">
+            <p class="hint">カンマで区切ると、混んでいるときに次のモデルで試します。空なら標準(${DEFAULT_MODELS})。</p>
+          </div>
+        </details>
+        <button class="btn primary wide" type="submit" data-ai-save>保存して確かめる</button>
+        <p class="hint ai-result" data-ai-result hidden></p>
+        <button class="btn ghost danger wide" type="button" data-ai-clear hidden>キーを削除する</button>
+      </form>
+      <p class="hint">無料枠では、読み取った動画が Google 側の品質向上に使われることがあります。読み取りは短い動画で30秒ほど、15分の動画だと3〜4分かかります。</p>
+    </div>
+
     <div class="set-page" data-page="app" hidden>
       <ul class="app-list">
         <li data-install-row><button type="button" data-install>ホーム画面に追加<span data-install-sub></span></button></li>
@@ -150,6 +188,45 @@ function build(body) {
   </div>`;
 
   $$('[data-to]').forEach((b) => b.addEventListener('click', () => goPage(b.dataset.to)));
+
+  // AI のキー
+  const aiKey = $('#ai-key'), aiModel = $('#ai-model'), aiShow = $('[data-ai-show]'), aiResult = $('[data-ai-result]');
+  aiShow.addEventListener('click', () => {
+    const show = aiKey.type === 'password';
+    aiKey.type = show ? 'text' : 'password';
+    aiShow.textContent = show ? '隠す' : '表示';
+    aiShow.setAttribute('aria-pressed', String(show));
+  });
+  $('.ai-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const key = aiKey.value.trim(), model = aiModel.value.trim();
+    const btn = $('[data-ai-save]');
+    if (!key) { aiKey.focus(); return ui.toast('API キーを貼ってください'); }
+    btn.disabled = true;
+    btn.textContent = '確かめています…';
+    aiResult.hidden = true;
+    try {
+      await testAiKey(key);
+      await store.ai.save({ key, model });
+      aiResult.className = 'hint ai-result ok';
+      aiResult.textContent = 'キーを保存しました。レシピの登録で YouTube の URL を貼ると AI が動きます';
+      ui.toast('AI のキーを保存しました');
+    } catch (err) {
+      aiResult.className = 'hint ai-result bad';
+      aiResult.textContent = aiErrorText(err);
+    }
+    aiResult.hidden = false;
+    btn.disabled = false;
+    btn.textContent = '保存して確かめる';
+  });
+  $('[data-ai-clear]').addEventListener('click', async () => {
+    await store.ai.save({ key: '' });
+    aiKey.value = '';
+    aiResult.hidden = true;
+    renderAi();
+    ui.toast('AI のキーを削除しました');
+  });
+  store.on('ai', () => { renderSummary(); if (cur === 'ai') renderAi(); });
 
   // 同期とアカウント
   $('[data-acc-login] button').addEventListener('click', async (e) => {
@@ -271,6 +348,16 @@ function renderPage(name) {
   else if (name === 'meals') renderMeals();
   else if (name === 'trash') renderTrash();
   else if (name === 'app') renderApp();
+  else if (name === 'ai') renderAi();
+}
+
+function renderAi() {
+  const a = store.ai;
+  const key = $('#ai-key');
+  if (document.activeElement !== key) key.value = a.key;
+  const model = $('#ai-model');
+  if (document.activeElement !== model) model.value = a.model;
+  $('[data-ai-clear]').hidden = !a.key;
 }
 
 // 設定の配列(読み込み前は store.settings が空なので、無ければ空の配列)
@@ -285,6 +372,7 @@ function renderSummary() {
     staples: Array.isArray(s.staples) ? `${s.staples.length}品` : '自動',
     meals: settingList('meals').map((m) => MEAL_SHORT[m]).join('・'),
     trash: store.trash.list.length ? `${store.trash.list.length}件` : '',
+    ai: store.ai.key ? '設定済み' : '未設定',
   };
   Object.entries(sum).forEach(([k, v]) => { $(`[data-sum="${k}"]`).textContent = v; });
 

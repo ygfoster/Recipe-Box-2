@@ -181,6 +181,7 @@ v1 にある機能は**すべて**入れる。ここに無い機能を足さな�
 | `users/{uid}/shopping/{id}` | 買い物の1点。`{ id, key, name, amount, recipes:string[], group:'food'|'season'|'manual', source:'plan'|'manual', checked, createdAt }` |
 | `users/{uid}/meta/settings` | `{ genres:string[], courses:string[], staples:string[]|null, meals:string[], boxName?:string }`。`boxName` は v2 で追加(v1 は無視する) |
 | `users/{uid}/meta/boxes` | **v2 のみ、本人だけ**。参加しているボックス `{ boxes:[{ ownerUid, ownerName, joinedAt }] }` |
+| `users/{uid}/meta/ai` | **v2 のみ、本人だけ**。AI(Gemini)の設定 `{ key:string, model:string }`。公開リポジトリにキーを置かないため、使う人が設定画面で入れる |
 | `users/{uid}/members/{memberUid}` | **v2 のみ**。メンバー `{ code, name, photo, joinedAt }` |
 | `invites/{code}` | **v2 のみ**。招待 `{ ownerUid, ownerName, createdAt, expiresAt:number(ms) }`。コードは `ABCDEFGHJKMNPQRSTUVWXYZ23456789`(紛らわしい文字を除く)から6文字。有効期限7日 |
 

@@ -305,8 +305,8 @@
 .ai-box { display: block; margin-top: 6px; }
 .ai-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: var(--action-tint); color: var(--action); font-size: 13px; font-weight: 600; transition: transform .35s var(--spring), background .2s; }
 .ai-btn:active { transform: scale(.95); }
-.ai-status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
-.ai-dots { display: inline-flex; gap: 3px; }
+.ai-status { display: block; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.ai-dots { display: inline-flex; gap: 3px; margin-right: 8px; vertical-align: middle; }
 .ai-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--action); animation: aiDot 1.2s ease-in-out infinite; }
 .ai-dots i:nth-child(2) { animation-delay: .15s; }
 .ai-dots i:nth-child(3) { animation-delay: .3s; }
@@ -450,3 +450,5 @@
   .c-steps .num { left: 12px; top: 16px; }
   .timer { min-width: 0; }
 }
+.ai-status b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.ai-status .ai-note { display: block; font-size: 11px; color: var(--ink-3); }

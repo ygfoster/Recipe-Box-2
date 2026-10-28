@@ -70,6 +70,12 @@ export async function init() {
         if (!snap.metadata.fromCache || snap.exists()) onData(snap.exists() ? snap.data() : null);
       }, onError);
     },
+    // AI の設定(本人だけ。users/{uid}/meta/ai)。onData(data | null)、settings と同じくキャッシュの「無い」は待つ
+    watchAi(uid, onData, onError) {
+      return F.onSnapshot(docOf(uid, 'meta', 'ai'), (snap) => {
+        if (!snap.metadata.fromCache || snap.exists()) onData(snap.exists() ? snap.data() : null);
+      }, onError);
+    },
     // 参加しているボックス(本人だけ)。onData(boxes[], fromCache)
     watchBoxes(uid, onData, onError) {
       return F.onSnapshot(docOf(uid, 'meta', 'boxes'), (snap) => {
@@ -82,6 +88,7 @@ export async function init() {
     put: (ownerUid, name, d) => F.setDoc(docOf(ownerUid, name, d.id), d),
     del: (ownerUid, name, id) => F.deleteDoc(docOf(ownerUid, name, id)),
     putSettings: (ownerUid, data) => F.setDoc(docOf(ownerUid, 'meta', 'settings'), data),
+    putAi: (uid, data) => F.setDoc(docOf(uid, 'meta', 'ai'), data),
     setBoxes: (uid, boxes) => F.setDoc(docOf(uid, 'meta', 'boxes'), { boxes }),
     // 献立・買い物リストはまとめて書く。1回の上限が500件なので450件ずつに分ける
     batch(ownerUid, name, ops) {
