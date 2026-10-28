@@ -1,5 +1,5 @@
 // オフラインでも開けるように、アプリ本体をキャッシュする(v1 と同じ方針。キャッシュ名だけ分ける)
-const CACHE = 'rb2-v5';
+const CACHE = 'rb2-v6';
 const SHELL = [
   './', './index.html', './firebase-config.js', './manifest.webmanifest',
   './css/base.css', './css/recipes.css', './css/plan.css', './css/shop.css', './css/fridge.css', './css/settings.css', './css/sharing.css',
