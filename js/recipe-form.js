@@ -268,6 +268,14 @@ function renderVideoPreview(autofill) {
 }
 
 /* ---------------- AI(Gemini)で動画からレシピを読み取る ---------------- */
+// 進行中の読み取りを止め、届きかけの結果も捨てる(画面を閉じた・別のレシピを開いた・URL を変えた)
+function stopAi() {
+  videoSeq++;
+  clearTimeout(videoTimer);
+  if (aiAbort) { aiAbort.abort(); aiAbort = null; }
+  if (aiOv && ui.isOpen(aiOv)) ui.closeNow(aiOv);
+  aiResult = null;
+}
 function mountAi(text, v, title, seq, auto) {
   const box = el('div', 'ai-box');
   text.append(box);
@@ -281,7 +289,7 @@ function mountAi(text, v, title, seq, auto) {
   };
   const run = async () => {
     if (aiAbort) aiAbort.abort();
-    aiAbort = new AbortController();
+    const ctrl = (aiAbort = new AbortController());
     box.innerHTML = '';
     const st = el('span', 'ai-status');
     const sec = el('b');
@@ -292,9 +300,9 @@ function mountAi(text, v, title, seq, auto) {
     const tick = setInterval(() => { sec.textContent = `${Math.round((Date.now() - t0) / 1000)}秒`; }, 1000);
     box.append(st);
     try {
-      const r = await extractRecipeFromVideo({ url: v.url, title }, { signal: aiAbort.signal });
+      const r = await extractRecipeFromVideo({ url: v.url, title }, { signal: ctrl.signal });
       clearInterval(tick);
-      if (seq !== videoSeq) return;
+      if (seq !== videoSeq || ctrl.signal.aborted || !ui.isOpen(ov)) return;
       box.innerHTML = '';
       const again = el('button', 'link small', '読み取り結果をもう一度見る');
       again.type = 'button';
@@ -303,7 +311,7 @@ function mountAi(text, v, title, seq, auto) {
       openAiPreview(r);
     } catch (e) {
       clearInterval(tick);
-      if (seq !== videoSeq || (e && e.code === 'timeout' && aiAbort && aiAbort.signal.aborted && !ui.isOpen(ov))) return;
+      if (seq !== videoSeq || ctrl.signal.aborted || (e && e.code === 'aborted')) return;
       box.innerHTML = '';
       box.append(el('span', 'ai-error', aiErrorText(e)));
       const retry = el('button', 'link small', 'もう一度');
@@ -437,12 +445,11 @@ async function submit() {
 }
 
 export function init() {
-  ov = ui.page({ id: 'form', title: '新しいレシピ', build });
+  ov = ui.page({ id: 'form', title: '新しいレシピ', build, onClose: stopAi });
   F.form.addEventListener('submit', (e) => { e.preventDefault(); submit(); });
   F.form.querySelectorAll('textarea').forEach((t) => t.addEventListener('input', () => autoGrow(t)));
   F.video.addEventListener('input', () => {
-    clearTimeout(videoTimer);
-    if (aiAbort) { aiAbort.abort(); aiAbort = null; }
+    stopAi();
     videoTimer = setTimeout(() => renderVideoPreview(true), 350);
   });
   F.photoInput.addEventListener('change', () => { handleFile(F.photoInput.files[0]); F.photoInput.value = ''; });
@@ -460,6 +467,7 @@ export function init() {
 
 // id を渡すと編集、無ければ新規。preset = { name?, videoUrl?, memo? }(共有メニューから)
 export function openForm(id = null, preset = {}) {
+  stopAi();
   const r = id ? store.recipes.get(id) : null;
   editingId = r ? r.id : null;
   ov.setTitle(r ? 'レシピを編集' : '新しいレシピ');

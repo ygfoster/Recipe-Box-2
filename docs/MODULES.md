@@ -357,17 +357,17 @@ YouTube の埋め込みは `https://www.youtube.com/embed/{id}?autoplay=1&playsi
 
 Gemini API(REST、ブラウザから直接)に YouTube の URL を渡して、動画の中身から料理名・材料・作り方・人数・時間・タグ・メモを JSON で返してもらう。キーは **設定画面で入れたもの**(`store.ai.key`。`firebase-config.js` には置かない)。モデルは `store.ai.model`(カンマ区切りで複数。混雑(503)や無くなったモデル(404)は次へ。空なら `DEFAULT_MODELS` = `gemini-3.5-flash-lite,gemini-3-flash-preview`)。
 
-`store.ai` は `{ key, model }` の入れ物で、`store.ai.save({ key?, model? })` で保存、変更は `store.on('ai')`。ログイン中は自分の `users/{uid}/meta/ai`(本人だけ。ルールの `meta/{doc}`)、未ログインは `localStorage` の `rb2:ai`。ボックスを切り替えても変わらない(自分のキー)。ログイン時にクラウドに無く端末にあれば送る(settings と同じ)。
+`store.ai` は `{ key, model }` の入れ物で、`store.ai.save({ key?, model? })` で保存、変更は `store.on('ai')`。ログイン中は自分の `users/{uid}/meta/ai`(本人だけ。ルールの `meta/{doc}`)、未ログインは `localStorage` の `rb2:ai`。ボックスを切り替えても変わらない(自分のキー)。ログイン時にクラウドに無く端末にあれば送り、送ったら端末のコピーは消す。アカウントが切り替わるたびに `applyAi(null)` でいったん空にする(前の人のキーを残さない)。保存の失敗は自分の uid で `onCloudError` に渡す(見ているボックスから外れないように)。
 
 | export | 役割 |
 |---|---|
 | `hasAi()` | キーがあるか。false なら登録画面では「AI で動画から…(設定が必要)」のリンクだけ出し、押すと `openSettings('ai')` |
 | `testAiKey(key)` | モデル一覧を1件取ってキーを確かめる(無料枠を使わない)。失敗は `code`:`bad-key` `network` `timeout` |
-| `extractRecipeFromVideo({ url, title }, { signal })` | 動画は 0.5 コマ/秒・低解像度(`video_metadata.fps` と `mediaResolution`)で送り、読み取って正規化済みの `{ name, servings, timeMinutes, ingredients:[{ name, amount, group }], steps:[{ text, startSec }], tags, notes, confidence }` を返す。300 秒で打ち切り(15 分の動画で 3〜4 分かかる)。失敗は `Error` に `code`:`no-key` `quota`(429)`busy`(混雑、モデルを順に試して 3 秒・8 秒待ち最大 3 巡したあと)`unsupported`(限定公開・長すぎ・非対応)`network` `timeout` `bad-response` |
+| `extractRecipeFromVideo({ url, title }, { signal })` | 動画は 0.5 コマ/秒・低解像度(`video_metadata.fps` と `mediaResolution`)で送り、読み取って正規化済みの `{ name, servings, timeMinutes, ingredients:[{ name, amount, group }], steps:[{ text, startSec }], tags, notes, confidence }` を返す。300 秒で打ち切り(15 分の動画で 3〜4 分かかる)。失敗は `Error` に `code`:`no-key` `quota`(429)`busy`(混雑、モデルを順に試して 3 秒・8 秒待ち最大 3 巡したあと)`unsupported`(限定公開・長すぎ・非対応)`network` `timeout`(5 分の期限)`aborted`(呼び出し側が止めた)`bad-key` `bad-response`。全モデルが 404 なら `unsupported` |
 | `extractToText(r)` | 登録画面のテキスト形式へ(`{ ingredients, steps }`。材料は `名前 分量`、グループは `【タレ】` の行、手順は `m:ss ` の頭出し付き) |
 | `aiErrorText(e)` | `code` に応じた日本語の案内文 |
 | `DEFAULT_MODELS` | 既定のモデル(設定画面のプレースホルダにも使う) |
 
-`recipe-form.js` の流れ:動画 URL のプレビューでタイトルを取ったあと、`hasAi()` なら `mountAi(...)`。材料・作り方が空(かつ概要欄から入っていない)なら自動で読み取りを始め、そうでなければ「AI で動画から材料・作り方を読み取る」ボタン。結果は `#ai-preview` のシートで見せ、「この内容で入れる」で `applyAi(r)`(料理名は空か動画タイトルの自動入力のままのときだけ置き換え、材料・作り方は置き換え、タグは合流、メモは空のときだけ)。URL を変えると進行中の呼び出しは `AbortController` で止める。「読み取り結果をもう一度見る」で同じ結果をもう一度開ける。
+`recipe-form.js` の流れ:動画 URL のプレビューでタイトルを取ったあと、`hasAi()` なら `mountAi(...)`。材料・作り方が空(かつ概要欄から入っていない)なら自動で読み取りを始め、そうでなければ「AI で動画から材料・作り方を読み取る」ボタン。結果は `#ai-preview` のシートで見せ、「この内容で入れる」で `applyAi(r)`(料理名は空か動画タイトルの自動入力のままのときだけ置き換え、材料・作り方は置き換え、タグは合流、メモは空のときだけ)。URL を変えたとき・登録画面を閉じたとき・別のレシピを開いたときは `stopAi()` で進行中の呼び出しを止め、`videoSeq` を進めて届きかけの結果も捨てる(成功時も画面が開いていなければ捨てる)。「読み取り結果をもう一度見る」で同じ結果をもう一度開ける。
 
 `settings.js` の `'ai'` ページ:キー(password 入力+表示切替)、モデル(details の中)、「保存して確かめる」(`testAiKey` → `store.ai.save`)、「キーを削除する」。一覧の値は 設定済み/未設定。

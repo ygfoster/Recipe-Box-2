@@ -17,12 +17,13 @@ export async function testAiKey(key) {
   let res;
   try {
     res = await fetch(`${ENDPOINT}?pageSize=1`, { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(15000) });
-  } catch (e) {
-    throw err(e && e.name === 'TimeoutError' ? 'timeout' : 'network');
+  } catch {
+    throw err('network');
   }
   if (res.ok) return true;
   let detail = '';
   try { detail = (await res.json()).error?.message || ''; } catch { /* 本文なし */ }
+  if (res.status === 429) throw err('quota', detail);
   throw err(res.status === 400 || res.status === 403 ? 'bad-key' : 'network', detail);
 }
 
@@ -71,7 +72,7 @@ const PROMPT = `この YouTube 動画は料理のレシピ動画です。動画�
 - 料理のレシピ動画でない場合は confidence を low にして、ingredients と steps は空にする`;
 
 // 動画URL(とヒントのタイトル)からレシピを読み取る → { name, servings, timeMinutes, ingredients, steps, tags, notes, confidence }
-// 失敗は Error(code: 'no-key' | 'quota' | 'busy' | 'unsupported' | 'network' | 'bad-response' | 'timeout')
+// 失敗は Error(code: 'no-key' | 'bad-key' | 'quota' | 'busy' | 'unsupported' | 'network' | 'bad-response' | 'timeout' | 'aborted'(呼び出し側が止めた))
 export async function extractRecipeFromVideo({ url, title = '' }, { signal } = {}) {
   const key = store.ai.key;
   if (!key) throw err('no-key');
@@ -80,7 +81,14 @@ export async function extractRecipeFromVideo({ url, title = '' }, { signal } = {
   const PER_MODEL_MS = 150000; // ほかに試せるモデルが残っているときは、1モデル 2分半で見切って次へ
   const deadline = Date.now() + TOTAL_MS;
   const timer = setTimeout(() => ctrl.abort(), TOTAL_MS);
-  if (signal) signal.addEventListener('abort', () => ctrl.abort(), { once: true });
+  const onOuter = () => ctrl.abort();
+  if (signal) {
+    if (signal.aborted) { clearTimeout(timer); throw err('aborted'); }
+    signal.addEventListener('abort', onOuter, { once: true });
+  }
+  const finish = () => { clearTimeout(timer); if (signal) signal.removeEventListener('abort', onOuter); };
+  // 呼び出し側が止めた(URL が変わった・画面を閉じた)のか、5分の期限なのかを区別する
+  const stopped = () => err(signal && signal.aborted ? 'aborted' : 'timeout');
   // 0.5 コマ/秒・低解像度で送る(音声は全部入る)。トークンが減って読み取りが 2〜4 倍速くなり、材料・手順の質は変わらない。
   // Gemini 3 系は「考える量」を少なめにすると、同じ質のまま速く安定する
   const bodyFor = (model) => JSON.stringify({
@@ -98,18 +106,22 @@ export async function extractRecipeFromVideo({ url, title = '' }, { signal } = {
   // 混雑中(503 など)は次のモデルで試し、全部ダメなら少し待ってもう一巡(最大3巡)
   const RETRY_WAIT = [3000, 8000];
   const models = modelNames();
-  let res;
+  let text = '';
+  let notFound = 0; // この巡で 404 だったモデルの数(全部なら「無いモデル」として知らせる)
   for (let attempt = 0; ; attempt++) {
+    if (ctrl.signal.aborted) { finish(); throw stopped(); }
     const model = models[attempt % models.length];
+    const firstInRound = attempt % models.length === 0;
     const lastInRound = attempt % models.length === models.length - 1;
     const round = Math.floor(attempt / models.length);
     const moreToTry = !(lastInRound && round >= RETRY_WAIT.length);
-    // この1回だけの打ち切り(全体の期限か、次があるなら 2分半)
+    if (firstInRound) notFound = 0;
+    // この1回だけの打ち切り(全体の期限か、次があるなら 2分半)。本文の受信まで含める
     const one = new AbortController();
     const onAbort = () => one.abort();
     ctrl.signal.addEventListener('abort', onAbort, { once: true });
     const oneTimer = setTimeout(() => one.abort(), Math.max(1000, Math.min(deadline - Date.now(), moreToTry ? PER_MODEL_MS : TOTAL_MS)));
-    let gaveUp = false;
+    let res, body = '', gaveUp = false;
     try {
       res = await fetch(`${ENDPOINT}/${encodeURIComponent(model)}:generateContent`, {
         method: 'POST',
@@ -117,10 +129,11 @@ export async function extractRecipeFromVideo({ url, title = '' }, { signal } = {
         signal: one.signal,
         body: bodyFor(model),
       });
+      body = await res.text();
     } catch (e) {
       if (ctrl.signal.aborted || !(e && e.name === 'AbortError')) {
-        clearTimeout(timer);
-        throw err(e && e.name === 'AbortError' ? 'timeout' : 'network');
+        finish();
+        throw e && e.name === 'AbortError' ? stopped() : err('network');
       }
       gaveUp = true; // このモデルだけ見切った → 次へ
     } finally {
@@ -129,50 +142,60 @@ export async function extractRecipeFromVideo({ url, title = '' }, { signal } = {
     }
     if (gaveUp) {
       if (moreToTry) continue;
-      clearTimeout(timer);
+      finish();
       throw err('timeout');
     }
-    if (res.ok) break;
+    if (res.ok) { text = body; break; }
     let detail = '';
-    try { detail = (await res.json()).error?.message || ''; } catch { /* 本文なし */ }
+    try { detail = JSON.parse(body).error?.message || ''; } catch { /* 本文なし */ }
+    const badKey = (res.status === 400 || res.status === 403) && /api key|api_key|permission/i.test(detail);
+    if (badKey) { finish(); throw err('bad-key', detail); }
+    if (res.status === 404) notFound++;
     const busy = res.status === 503 || res.status === 500 || res.status === 502 || res.status === 504
       || (res.status === 404 && models.length > 1); // 無くなったモデルも次へ
+    if (lastInRound && notFound === models.length) { finish(); throw err('unsupported', detail); }
     if (busy && !lastInRound) continue;
     if (busy && round < RETRY_WAIT.length) {
+      if (ctrl.signal.aborted) { finish(); throw stopped(); }
       await new Promise((r, rej) => {
-        const t = setTimeout(r, RETRY_WAIT[round]);
-        ctrl.signal.addEventListener('abort', () => { clearTimeout(t); rej(err('timeout')); }, { once: true });
-      }).catch((e) => { clearTimeout(timer); throw e; });
+        const t = setTimeout(() => { ctrl.signal.removeEventListener('abort', stop); r(); }, RETRY_WAIT[round]);
+        const stop = () => { clearTimeout(t); rej(stopped()); };
+        ctrl.signal.addEventListener('abort', stop, { once: true });
+      }).catch((e) => { finish(); throw e; });
       continue;
     }
-    clearTimeout(timer);
+    finish();
     if (res.status === 429) throw err('quota', detail);
     if (res.status === 400 || res.status === 403 || res.status === 404) throw err('unsupported', detail);
     if (busy) throw err('busy', detail);
     throw err('network', detail);
   }
-  clearTimeout(timer);
+  finish();
   let data;
   try {
-    const j = await res.json();
-    const text = j.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
-    data = JSON.parse(text);
+    const j = JSON.parse(text);
+    const out = j.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
+    data = normalizeExtract(JSON.parse(out));
   } catch {
     throw err('bad-response');
   }
-  return normalizeExtract(data);
+  // 何も読み取れていない(料理名も材料も手順も無い)返事は失敗として扱う
+  if (!data.name && !data.ingredients.length && !data.steps.length) throw err('bad-response');
+  return data;
 }
 
-function normalizeExtract(d) {
-  const s = (v) => (typeof v === 'string' ? v.trim() : '');
+function normalizeExtract(d0) {
+  const d = d0 && typeof d0 === 'object' && !Array.isArray(d0) ? d0 : {};
+  const s = (v, max = 200) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
   const n = (v) => (Number.isFinite(+v) && +v > 0 ? Math.round(+v) : 0);
-  const ingredients = Array.isArray(d.ingredients) ? d.ingredients
-    .map((x) => ({ name: s(x && x.name), amount: s(x && x.amount), group: s(x && x.group) }))
+  const obj = (x) => (x && typeof x === 'object' ? x : {});
+  const ingredients = Array.isArray(d.ingredients) ? d.ingredients.map(obj)
+    .map((x) => ({ name: s(x.name, 80), amount: s(x.amount, 40), group: s(x.group, 30) }))
     .filter((x) => x.name) : [];
-  const steps = Array.isArray(d.steps) ? d.steps
-    .map((x) => ({ text: s(x && x.text), startSec: Number.isFinite(+(x && x.startSec)) && +x.startSec >= 0 ? Math.round(+x.startSec) : -1 }))
+  const steps = Array.isArray(d.steps) ? d.steps.map(obj)
+    .map((x) => ({ text: s(x.text, 500), startSec: Number.isFinite(+x.startSec) && +x.startSec >= 0 ? Math.round(+x.startSec) : -1 }))
     .filter((x) => x.text) : [];
-  const tags = Array.isArray(d.tags) ? [...new Set(d.tags.map(s).filter(Boolean))].slice(0, 5) : [];
+  const tags = Array.isArray(d.tags) ? [...new Set(d.tags.map((t) => s(t, 20).replace(/^#/, '')).filter(Boolean))].slice(0, 5) : [];
   return {
     name: s(d.name).slice(0, 80),
     servings: Math.min(20, n(d.servings)),
@@ -180,7 +203,7 @@ function normalizeExtract(d) {
     ingredients: ingredients.slice(0, 60),
     steps: steps.slice(0, 40),
     tags,
-    notes: s(d.notes),
+    notes: s(d.notes, 1000),
     confidence: ['high', 'medium', 'low'].includes(s(d.confidence)) ? s(d.confidence) : 'medium',
   };
 }
@@ -205,8 +228,9 @@ export function aiErrorText(e) {
     'no-key': 'AI のキーが設定されていません。設定の「AI で動画を読み取る」から入れてください',
     'bad-key': 'このキーは使えませんでした。Google AI Studio で作ったキーを貼り直してください',
     quota: '今日の無料枠を使い切ったようです。明日また試すか、Google 側で有料プランにしてください',
-    unsupported: `この動画は読み取れませんでした。限定公開・非公開の動画や、長すぎる動画は対象外です${detail}`,
+    unsupported: `この動画は読み取れませんでした。限定公開・非公開の動画や、長すぎる動画、無いモデル名は対象外です${detail}`,
     busy: 'AI が混み合っていて今は読み取れませんでした。少し待ってからもう一度試してください',
+    aborted: '読み取りを止めました',
     network: `AI に接続できませんでした。電波の状態を確認してください${detail}`,
     timeout: '5分たっても読み取りが終わらなかったので止めました。短い動画で試すか、あとでもう一度試してください',
     'bad-response': 'AI の返事を読み取れませんでした。もう一度試してください',

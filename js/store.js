@@ -72,7 +72,9 @@ async function saveAi(next) {
   const n = normalizeAi({ ...ai, ...(next || {}) });
   applyAi(n);
   if (S.mode !== 'cloud') { prefs.set('ai', n); return true; }
-  cloudWrite(S.cloud.putAi(S.user.uid, n));
+  prefs.del('ai'); // クラウドに置いたら端末の平文コピーは持たない
+  // 失敗は自分のアカウントの問題として扱う(見ているボックスのせいにして外れないように)
+  S.cloud.putAi(S.user.uid, n).catch((e) => onCloudError(S.user.uid, e));
   evalSync(true);
   return true;
 }
@@ -82,7 +84,8 @@ function onAiSnap(data) {
   const local = normalizeAi(prefs.get('ai', null));
   if (!local.key && !local.model) return;
   applyAi(local);
-  cloudWrite(S.cloud.putAi(S.user.uid, local));
+  prefs.del('ai');
+  S.cloud.putAi(S.user.uid, local).catch((e) => onCloudError(S.user.uid, e));
 }
 
 const getRecipe = (id) => S.recipes.find((r) => r.id === id);
@@ -271,6 +274,7 @@ function onAuth(user) {
   if (unsubAi) { unsubAi(); unsubAi = null; }
   S.user = user;
   clearData();
+  applyAi(null); // 前のアカウントのキーを残さない(ログイン後は自分の meta/ai、未ログインは端末のものが入る)
   if (user) {
     S.mode = 'cloud';
     prefs.set('localOnly', false);
