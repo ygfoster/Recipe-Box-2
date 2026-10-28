@@ -1,0 +1,412 @@
+/* =========================================================
+   レシピボックス2 — レシピ一式(一覧・詳細・登録・調理モード・小窓・タイマー)
+   色はすべて base.css のトークン(役割は base.css の先頭)。動きは transform と opacity だけ
+   影は浮いているもの(小窓・タイマー・予測変換・写真の上の ‹)だけ。面同士は --sunken の色差と 1px の線
+   ========================================================= */
+
+/* ---------- ホーム:検索(予測変換)と「冷蔵庫の食材から探す」 ---------- */
+.home-top { padding: 8px 0 0; text-align: center; }
+.search { position: relative; z-index: 15; max-width: 560px; margin: 0 auto; text-align: left; animation: rise .7s .1s var(--ease) both; }
+.search input {
+  width: 100%; height: 50px; border: 0; outline: 0; border-radius: var(--r-input); padding: 0 44px 0 46px;
+  background: var(--surface); box-shadow: 0 0 0 1px var(--line); font-size: 17px; -webkit-appearance: none; appearance: none;
+  transition: box-shadow .3s var(--ease);
+}
+.search input::-webkit-search-cancel-button, .search input::-webkit-search-decoration { -webkit-appearance: none; display: none; }
+.search input::placeholder { color: var(--ink-2); }
+.search.focus input { box-shadow: 0 0 0 2px var(--action); }
+.search-icon { position: absolute; z-index: 1; left: 16px; top: 16px; color: var(--ink-2); pointer-events: none; transition: transform .5s var(--spring); }
+.search-icon svg { width: 18px; height: 18px; }
+.search.focus .search-icon { transform: scale(1.12); }
+.clear {
+  position: absolute; right: 12px; top: 13px; width: 24px; height: 24px; border-radius: 50%; background: var(--fill); color: var(--ink-2);
+  display: grid; place-items: center; opacity: 0; transform: scale(.5); pointer-events: none; transition: opacity .25s, transform .4s var(--spring);
+}
+.search.has-text .clear { opacity: 1; transform: none; pointer-events: auto; }
+.suggest {
+  position: absolute; left: 0; right: 0; top: 58px; z-index: 10; padding: 6px; text-align: left; background: var(--surface); border-radius: 18px;
+  box-shadow: var(--shadow-float); opacity: 0; transform: translateY(-8px) scale(.98); transform-origin: top center; visibility: hidden;
+  transition: opacity .25s var(--ease), transform .4s var(--ease), visibility 0s .4s;
+}
+.suggest.open { opacity: 1; transform: none; visibility: visible; transition-delay: 0s; }
+.suggest li {
+  display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 12px; cursor: pointer; transition: background .2s;
+  animation: rise .45s var(--ease) both; animation-delay: calc(var(--i) * 35ms);
+}
+.suggest li.active, .suggest li:hover { background: var(--fill); }
+.suggest .thumb { width: 40px; height: 40px; border-radius: 10px; flex: none; overflow: hidden; background: var(--fill); display: grid; place-items: center; font-size: 18px; font-weight: 700; color: var(--ink-2); }
+.suggest .thumb img { width: 100%; height: 100%; object-fit: cover; }
+.suggest .thumb img.yt { transform: scale(1.34); }
+.suggest .s-name { min-width: 0; font-size: 16px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.suggest .s-cat { margin-left: auto; flex: none; max-width: 30%; font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 一致部分は色ではなく太さと濃さで示す */
+.suggest mark { background: none; color: var(--ink); font-weight: 700; }
+.fridge-link {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 6px 10px; border-radius: 999px; color: var(--action);
+  font-size: 15px; font-weight: 600; transition: background .2s, transform .35s var(--spring); animation: rise .7s .2s var(--ease) both;
+}
+.fridge-link:hover { background: var(--action-tint); }
+.fridge-link:active { transform: scale(.94); }
+
+/* ---------- ホーム:ジャンル1行 + 絞り込み、件数と効いている条件 ---------- */
+.filter-row { display: flex; align-items: center; gap: 8px; margin: 16px calc(-1 * var(--gutter)) 0; padding: 0 var(--gutter); }
+.filter-row .chips { flex: 1; min-width: 0; margin-left: calc(-1 * var(--gutter)); padding-left: var(--gutter); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
+.filter-btn {
+  flex: none; height: 38px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border-radius: 999px;
+  background: var(--surface); box-shadow: 0 0 0 1px var(--line); color: var(--ink); font-size: 14px; font-weight: 600;
+  transition: transform .35s var(--spring), background .3s, color .3s;
+}
+.filter-btn:active { transform: scale(.94); }
+.filter-btn.on { background: var(--selected-bg); color: var(--selected-fg); box-shadow: none; }
+.filter-n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; font-size: 11px; line-height: 18px; text-align: center; background: rgba(127,127,127,.35); }
+.result-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 14px; min-height: 28px; }
+.count { color: var(--ink-2); font-size: 14px; font-weight: 600; white-space: nowrap; }
+.active-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.af-chip {
+  display: inline-flex; align-items: center; gap: 4px; height: 28px; max-width: 100%; padding: 0 8px 0 12px; border-radius: 999px;
+  background: var(--selected-bg); color: var(--selected-fg); font-size: 13px; font-weight: 600; white-space: nowrap; animation: pop .35s var(--ease) both;
+}
+.af-chip svg { width: 12px; height: 12px; opacity: .7; }
+
+/* ---------- ホーム:写真が主役のカード ---------- */
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.card {
+  position: relative; border-radius: var(--r-card); overflow: hidden; cursor: pointer; outline: none; background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line); transition: transform .55s var(--ease); will-change: transform;
+  /* 角丸の中で画像を拡大しても外にはみ出さない(Safari)。mask は使わない(フォーカスの輪が隠れる) */
+  isolation: isolate;
+}
+.card:focus-visible { box-shadow: 0 0 0 3px var(--action); }
+.card:active { transform: scale(.975); transition-duration: .2s; }
+.card-img { position: relative; aspect-ratio: 1 / 1; overflow: hidden; background: var(--sunken); }
+.card-img img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .6s, transform .9s var(--ease); }
+.card-img img.loaded { opacity: 1; }
+.card-img img.yt { transform: scale(1.34); }
+.badge-play {
+  position: absolute; left: 10px; top: 10px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px 4px 7px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; color: #fff; background: rgba(0,0,0,.55);
+}
+.badge-play svg { width: 12px; height: 12px; }
+/* 料理名は写真の下部に重ねる(下から上へのグラデーションの上に白文字)。メタは小さく */
+.card-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 44px 14px 14px; color: #fff; background: linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,.42) 55%, rgba(0,0,0,0)); pointer-events: none; }
+.card-name {
+  font-size: 17px; font-weight: 700; line-height: 1.3; letter-spacing: -.01em; word-break: break-word; text-shadow: 0 1px 2px rgba(0,0,0,.35);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.card-meta { margin-top: 3px; display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; font-weight: 500; opacity: .88; }
+.card-meta .meta-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini-star { flex: none; font-weight: 700; }
+/* 写真が無いレシピは面の色の上に料理名を大きく(白文字にしない) */
+.card.no-photo .card-img { background: var(--surface); }
+.card.no-photo .card-cap { background: none; color: var(--ink); padding: 16px; }
+.card.no-photo .card-name { font-size: 22px; letter-spacing: -.02em; -webkit-line-clamp: 3; text-shadow: none; }
+.card.no-photo .card-meta { color: var(--ink-2); opacity: 1; }
+.card.no-photo .badge-play, .card.no-photo .fav { background: var(--fill); color: var(--ink-2); }
+.card.no-photo .fav.on { background: var(--fill); }
+@media (hover: hover) and (pointer: fine) {
+  .card:hover { transform: translateY(-4px); }
+  .card:hover .card-img img { transform: scale(1.06); }
+  .card:hover .card-img img.yt { transform: scale(1.42); }
+}
+
+/* ---------- お気に入り(♥ だけがお気に入り色) ---------- */
+.fav { display: grid; place-items: center; border-radius: 50%; color: #fff; transition: transform .4s var(--spring), background .3s; }
+.fav svg { width: 18px; height: 18px; }
+.fav path { fill: none; stroke: currentColor; stroke-width: 2; transition: fill .25s; }
+.fav.on path { fill: var(--favorite); stroke: var(--favorite); }
+.fav:active { transform: scale(.85); }
+.fav.pop { animation: heartPop .5s var(--spring); }
+.card .fav { position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; background: rgba(0,0,0,.4); }
+.card .fav.on { background: rgba(255,255,255,.92); }
+.fav.big { width: 44px; height: 44px; flex: none; background: var(--fill); color: var(--ink-2); }
+.fav.big svg { width: 22px; height: 22px; }
+
+/* ---------- 絞り込みシート ---------- */
+.filter-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.filter-chips .chip { box-shadow: none; background: var(--sunken); }
+.filter-chips .chip.active { background: var(--selected-bg); color: var(--selected-fg); }
+.radio-list { border-radius: 16px; background: var(--sunken); overflow: hidden; }
+.radio-list li + li { border-top: 1px solid var(--line); }
+.radio-item { width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px; font-size: 15px; text-align: left; color: var(--ink); transition: background .2s; }
+.radio-item:hover { background: var(--fill); }
+.radio-item.selected { font-weight: 700; }
+.ri-mark { width: 18px; height: 18px; flex: none; color: var(--ink); opacity: 0; transform: scale(.6); transition: opacity .2s, transform .35s var(--spring); }
+.ri-mark svg { width: 18px; height: 18px; }
+.radio-item.selected .ri-mark { opacity: 1; transform: none; }
+.filter-foot { display: flex; gap: 10px; }
+.filter-foot .btn { flex: 1; min-width: 0; padding-left: 12px; padding-right: 12px; }
+
+/* ---------- 詳細(全画面ページ:写真 → 本文 → 下に固定のアクションバー) ---------- */
+#detail .page { display: flex; flex-direction: column; padding-bottom: 0; }
+#detail .page-body { flex: 1; display: flex; flex-direction: column; width: 100%; padding: 0; }
+/* 左上の ‹:高さ0の sticky に浮かせて、スクロールしても上に残る */
+.d-top { position: sticky; top: 0; z-index: 4; height: 0; flex: none; }
+.d-back {
+  position: absolute; left: 10px; top: calc(10px + env(safe-area-inset-top, 0px)); width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--surface) 92%, transparent); color: var(--ink); box-shadow: var(--shadow-float); transition: transform .35s var(--spring);
+}
+.d-back:active { transform: scale(.88); }
+.d-hero { position: relative; flex: none; aspect-ratio: 16 / 10; background: var(--sunken); overflow: hidden; display: grid; place-items: center; }
+.d-hero img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .5s; }
+.d-hero img.loaded { opacity: 1; }
+.d-hero img.yt { transform: scale(1.34); }
+.d-hero-glyph { font-size: 72px; line-height: 1; opacity: .5; }
+.d-hero.playable { cursor: pointer; }
+/* 写真を隠さないよう、再生(または「◯◯で開く」)は左下に小さく */
+.hero-play {
+  position: absolute; left: 14px; bottom: 14px; height: 40px; border-radius: 999px; color: #fff; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px; padding: 0 16px 0 10px; font-size: 15px; font-weight: 600; background: rgba(0,0,0,.58);
+  transition: transform .45s var(--spring), background .3s; animation: rise .6s .3s var(--ease) both;
+}
+.hero-play svg { width: 20px; height: 20px; }
+.d-hero.playable:hover .hero-play { transform: scale(1.05); }
+.hero-play:active { transform: scale(.92) !important; }
+.d-main { flex: none; padding: 18px var(--gutter) 8px; }
+.d-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.d-titlebar { display: flex; align-items: flex-start; gap: 12px; margin: 10px 0 8px; }
+.d-title { flex: 1; min-width: 0; font-size: clamp(26px, 6vw, 34px); letter-spacing: -.025em; line-height: 1.2; word-break: break-word; }
+/* ★は色ではなく濃さ(ink-3 → ink)で表す */
+.stars { display: flex; gap: 2px; margin-bottom: 22px; }
+.stars button { padding: 2px; color: var(--ink-3); transition: transform .35s var(--spring), color .25s; }
+.stars button svg { width: 26px; height: 26px; }
+.stars button path { fill: currentColor; }
+.stars button.on { color: var(--ink); }
+.stars button:hover { transform: scale(1.15); }
+.stars button.pop { animation: starPop .5s var(--spring) both; animation-delay: calc(var(--i) * 40ms); }
+.d-block { margin-bottom: 28px; }
+.d-block > .sec-h { margin-bottom: 10px; }
+.d-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.d-head .sec-h, .d-head h3 { margin: 0; }
+.scale-note { margin: -4px 0 6px; font-size: 12px; color: var(--ink-2); }
+.ing li { display: flex; justify-content: space-between; gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.ing li:last-child { border-bottom: 0; }
+.ing .i-name { min-width: 0; word-break: break-word; }
+.ing .i-amt { color: var(--ink-2); text-align: right; white-space: nowrap; }
+/* 換算した量は色ではなく濃さと太さで示す */
+.ing .i-amt.scaled { color: var(--ink); font-weight: 700; }
+.ing .i-amt.bump { animation: bump .45s var(--spring); }
+.ing li.i-head, .c-ing li.i-head { border-bottom: 0; padding: 16px 0 4px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.steps { counter-reset: s; }
+.steps li { counter-increment: s; position: relative; padding: 4px 0 16px 42px; word-break: break-word; }
+.steps li::before {
+  content: counter(s); position: absolute; left: 0; top: 2px; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--fill); color: var(--ink); font-size: 14px; font-weight: 700; display: grid; place-items: center;
+}
+.step-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+/* 手順の中の「押せるもの」(動画の頭出し・タイマー)は操作色 */
+.chip-btn {
+  display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 600;
+  background: var(--action-tint); color: var(--action); transition: transform .3s var(--spring), background .2s;
+}
+.chip-btn svg { width: 12px; height: 12px; }
+.chip-btn:hover { transform: scale(1.06); }
+.chip-btn:active { transform: scale(.92); }
+.d-tags { display: flex; gap: 8px; flex-wrap: wrap; margin: -8px 0 28px; }
+.tag { max-width: 100%; background: var(--fill); color: var(--action); border-radius: 999px; padding: 5px 12px; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: transform .3s var(--spring), background .2s; }
+.tag:hover { background: var(--action-tint); }
+.tag:active { transform: scale(.94); }
+.memo { color: var(--ink-2); white-space: pre-wrap; word-break: break-word; font-size: 15px; background: var(--sunken); padding: 14px 16px; border-radius: var(--r-input); }
+.memo a, .steps a, .c-steps a { color: var(--action); word-break: break-all; }
+/* 作った記録 */
+.log-sum { margin-bottom: 10px; color: var(--ink-2); font-size: 14px; }
+.log-form { display: none; }
+.log-form.open { display: block; animation: rise .4s var(--ease) both; }
+.log-form-inner { display: grid; gap: 8px; padding: 2px 2px 14px; }
+.log-row { display: flex; gap: 8px; }
+.log-form input[type="date"], .log-form .log-note {
+  border: 0; outline: 0; background: var(--sunken); border-radius: var(--r-input); padding: 10px 12px; font-size: 15px; min-width: 0;
+  -webkit-appearance: none; appearance: none; transition: box-shadow .3s var(--ease);
+}
+.log-form input:focus { box-shadow: 0 0 0 2px var(--action); }
+.log-form input[type="date"] { flex: 1; }
+.log-photo { display: inline-flex; align-items: center; flex: none; padding: 0 14px; border-radius: var(--r-input); background: var(--sunken); font-size: 14px; cursor: pointer; white-space: nowrap; color: var(--action); }
+.log-photo.has { color: var(--ink); font-weight: 600; }
+.log-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.log-list li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.log-list li:last-child { border-bottom: 0; }
+.log-list .l-date { font-size: 14px; font-weight: 600; white-space: nowrap; }
+.log-list .l-note { flex: 1; min-width: 0; color: var(--ink-2); font-size: 14px; word-break: break-word; }
+.log-list img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; flex: none; }
+.log-list .l-del { flex: none; padding: 6px; color: var(--ink-2); opacity: .5; transition: opacity .2s, color .2s; }
+.log-list .l-del:hover { opacity: 1; color: var(--danger); }
+/* 鉛筆=編集(操作色)、ゴミ箱=削除(危険色)。ゴミ箱を押すと「本当に削除する」が左へ広がる(背景は scaleX、文字は透明度) */
+.manage { display: flex; justify-content: flex-end; gap: 12px; margin: 4px 0 24px; }
+.manage-btn {
+  position: relative; width: 52px; height: 52px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
+  transition: background .3s var(--ease), color .3s var(--ease), transform .4s var(--spring);
+}
+.manage-btn svg { position: relative; z-index: 1; width: 22px; height: 22px; }
+.manage-btn:hover { transform: scale(1.08); }
+.manage-btn:active { transform: scale(.88); }
+.manage-btn.edit { background: var(--action-tint); color: var(--action); }
+.manage-btn.edit:hover svg { animation: wiggle .5s var(--ease); }
+.manage-btn.delete { background: var(--danger-tint); color: var(--danger); }
+.mb-bg {
+  position: absolute; right: 0; top: 0; height: 100%; width: 180px; border-radius: 999px; background: var(--danger);
+  transform-origin: right center; transform: scaleX(.289); opacity: 0; pointer-events: none; transition: transform .42s var(--sheet), opacity .2s;
+}
+.mb-label {
+  position: absolute; right: 52px; top: 0; height: 100%; display: flex; align-items: center; padding-left: 20px; white-space: nowrap; color: #fff; font-size: 15px; font-weight: 700;
+  opacity: 0; transform: translateX(12px); pointer-events: none; transition: opacity .25s .08s, transform .4s var(--sheet);
+}
+.manage-btn.delete.confirm { color: #fff; }
+.manage-btn.delete.confirm .mb-bg { transform: none; opacity: 1; pointer-events: auto; }
+.manage-btn.delete.confirm .mb-label { opacity: 1; transform: none; pointer-events: auto; }
+.manage-btn.delete.confirm svg { animation: wiggle .5s var(--ease); }
+.manage-btn.delete.confirm:hover { transform: none; }
+/* 下に固定のアクションバー(どこまで読んでも親指で押せる) */
+.d-bar {
+  position: sticky; bottom: 0; z-index: 4; margin-top: auto; display: flex; align-items: center; gap: 10px;
+  padding: 12px var(--gutter) calc(12px + env(safe-area-inset-bottom, 0px)); background: var(--bg); border-top: 1px solid var(--line);
+}
+.d-bar .btn { flex: 1; min-width: 0; padding: 12px 10px; font-size: 15px; }
+.d-bar .btn svg { width: 17px; height: 17px; }
+
+/* ---------- 登録・編集(全画面ページ) ---------- */
+.rform { padding-bottom: 8px; }
+.photo {
+  position: relative; display: grid; place-items: center; margin-top: 4px; aspect-ratio: 16 / 9; border-radius: 18px; background: var(--sunken);
+  border: 2px dashed var(--ink-3); color: var(--ink-2); overflow: hidden; cursor: pointer; transition: border-color .3s, transform .4s var(--spring);
+}
+.photo:hover, .photo.drag { border-color: var(--action); }
+.photo.drag { transform: scale(1.02); }
+.photo.filled { border-color: transparent; }
+.photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.photo img.pop-in { animation: pop .6s var(--ease) both; }
+.photo-hint { display: grid; place-items: center; gap: 6px; font-size: 14px; font-weight: 500; text-align: center; padding: 0 12px; }
+.photo-hint span { color: var(--action); }
+.photo-hint small { font-size: 12px; font-weight: 400; }
+.photo-remove { position: absolute; right: 10px; bottom: 10px; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; background: rgba(0,0,0,.6); color: #fff; }
+.picks { display: flex; flex-wrap: wrap; gap: 8px; }
+.picks-empty { font-size: 13px; color: var(--ink-2); }
+.video-prev { display: flex; align-items: center; gap: 12px; margin-top: 8px; padding: 8px; border-radius: var(--r-input); background: var(--sunken); animation: rise .5s var(--ease) both; }
+.vp-thumb { position: relative; width: 96px; aspect-ratio: 16 / 9; border-radius: 9px; overflow: hidden; flex: none; background: var(--fill); display: grid; place-items: center; font-size: 22px; }
+.vp-thumb img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .4s; }
+.vp-thumb img.loaded { opacity: 1; }
+.vp-text { min-width: 0; font-size: 13px; }
+.vp-text b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vp-text > span { color: var(--ink-2); }
+.vp-note { display: block; margin-top: 2px; font-size: 12px; color: var(--ink-2); }
+.vp-apply { display: block; margin-top: 4px; padding: 2px 0; }
+.video-prev.bad { color: var(--danger); background: var(--danger-tint); font-size: 13px; padding: 10px 12px; }
+.save-wide { margin-top: 32px; }
+
+/* ---------- 調理モード(全画面ページ) ---------- */
+.cook-eyebrow { margin-bottom: 14px; }
+.wake {
+  display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px; background: var(--fill); color: var(--ink-2);
+  font-size: 12px; font-weight: 600; white-space: nowrap; opacity: .5; transition: opacity .4s, color .4s, background .4s;
+}
+.wake.on { opacity: 1; color: var(--success); background: var(--success-tint); }
+.cook-body { display: grid; gap: 28px; align-items: start; }
+.cook-body h3 { margin-bottom: 12px; font-size: 20px; letter-spacing: -.02em; }
+.cook-body .d-head h3 { margin: 0; }
+.c-prog { font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.progress { height: 6px; background: var(--fill); border-radius: 99px; overflow: hidden; margin-bottom: 10px; }
+.progress span { display: block; height: 100%; width: 100%; background: var(--ink-2); border-radius: inherit; transform-origin: left center; transform: scaleX(0); transition: transform .6s var(--ease), background .4s; }
+.progress.done span { background: var(--success); }
+.c-ing li:not(.i-head) { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 17px; user-select: none; transition: opacity .35s; }
+.c-ing .check { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--ink-3); flex: none; display: grid; place-items: center; color: #fff; transition: background .3s, border-color .3s, transform .4s var(--spring); }
+.c-ing .check svg { width: 14px; height: 14px; opacity: 0; transform: scale(.4); transition: opacity .2s, transform .4s var(--spring); }
+.c-ing .c-name { flex: 1; min-width: 0; position: relative; word-break: break-word; }
+.c-ing .c-name::after { content: ""; position: absolute; left: 0; top: 52%; width: 100%; height: 1.5px; background: currentColor; transform-origin: left center; transform: scaleX(0); transition: transform .35s var(--ease); }
+.c-ing .c-amt { color: var(--ink-2); white-space: nowrap; }
+.c-ing li.done { opacity: .45; }
+.c-ing li.done .check { background: var(--success); border-color: var(--success); transform: scale(1.1); }
+.c-ing li.done .check svg { opacity: 1; transform: none; }
+.c-ing li.done .c-name::after { transform: none; }
+.c-steps li {
+  position: relative; padding: 18px 18px 18px 64px; margin-bottom: 12px; border-radius: 18px; background: var(--surface); box-shadow: 0 0 0 1px var(--line);
+  font-size: 19px; line-height: 1.6; cursor: pointer; user-select: none; word-break: break-word; transition: opacity .4s, transform .4s var(--spring);
+  animation: rise .6s var(--ease) both; animation-delay: calc(var(--i) * 50ms + .2s);
+}
+.c-steps li:active { transform: scale(.985); }
+.c-steps .num { position: absolute; left: 16px; top: 18px; width: 34px; height: 34px; border-radius: 50%; background: var(--sunken); color: var(--ink); font-size: 16px; font-weight: 700; display: grid; place-items: center; transition: background .3s, color .3s, transform .4s var(--spring); }
+.c-steps .num svg { width: 16px; height: 16px; }
+.c-steps li.done { opacity: .45; }
+.c-steps li.done .num { background: var(--success); color: #fff; transform: scale(.9); }
+.c-steps .chip-btn { font-size: 14px; padding: 6px 12px; }
+.c-steps .c-none { padding: 18px; cursor: default; color: var(--ink-2); font-size: 15px; }
+
+/* ---------- 動画の小窓(PiP) ---------- */
+#pip { transition: transform .6s cubic-bezier(.2,1.25,.35,1); }
+.pip-inner { position: relative; border-radius: 16px; overflow: hidden; background: #000; color: #fff; box-shadow: 0 18px 50px rgba(0,0,0,.35), 0 0 0 .5px rgba(255,255,255,.08); transition: transform .35s var(--spring); }
+/* 頭出ししたときの光り方は、白い縁を透明度で出し入れする */
+.pip-inner::after { content: ""; position: absolute; inset: 0; z-index: 3; border-radius: inherit; box-shadow: inset 0 0 0 3px #fff; opacity: 0; pointer-events: none; }
+#pip.flash .pip-inner::after { animation: pipFlash .6s var(--ease); }
+#pip.dragging .pip-inner { transform: scale(1.05); }
+#pip.dragging iframe { pointer-events: none; }
+.pip-bar { height: 40px; display: none; align-items: center; gap: 8px; padding: 0 8px 0 12px; cursor: grab; background: rgba(28,28,30,.96); user-select: none; touch-action: none; }
+#pip.big .pip-bar { display: flex; }
+#pip.dragging .pip-bar { cursor: grabbing; }
+.grip { width: 18px; height: 10px; flex: none; background: radial-gradient(circle, rgba(255,255,255,.5) 1.2px, transparent 1.6px) 0 0 / 6px 5px; }
+.pip-title { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .85; }
+.pip-btn { width: 26px; height: 26px; border-radius: 50%; background: rgba(255,255,255,.12); color: #fff; display: grid; place-items: center; transition: background .2s, transform .3s var(--spring); }
+.pip-btn:hover { background: rgba(255,255,255,.24); }
+.pip-btn:active { transform: scale(.85); }
+.pip-video { position: relative; aspect-ratio: 16 / 9; }
+.pip-frame { position: absolute; inset: 0; }
+.pip-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+/* 小さいときは動画の上に透明な面を重ねて、どこを持っても動かせるようにする */
+.pip-shield { position: absolute; inset: 0; z-index: 1; cursor: grab; touch-action: none; user-select: none; }
+.pip-shield::before { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.38); opacity: 0; transition: opacity .3s; }
+#pip.ctrls .pip-shield::before { opacity: 1; }
+#pip.big .pip-shield { display: none; }
+#pip.dragging .pip-shield { cursor: grabbing; }
+.pip-ctl {
+  position: absolute; display: grid; place-items: center; color: #fff; background: rgba(40,40,42,.72);
+  opacity: 0; pointer-events: none; transform: scale(.8); transition: opacity .25s var(--ease), transform .35s var(--spring), background .2s;
+}
+#pip.ctrls .pip-ctl { opacity: 1; pointer-events: auto; transform: none; }
+.pip-ctl:active { transform: scale(.85) !important; }
+.pip-ctl.corner { top: 8px; width: 32px; height: 32px; border-radius: 50%; }
+.pip-ctl.left { left: 8px; }
+.pip-ctl.right { right: 8px; }
+.pip-ctl.center { left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; }
+.pip-ctl.center svg { width: 24px; height: 24px; }
+
+/* ---------- タイマー(タブバーの上) ---------- */
+.timer {
+  position: relative; overflow: hidden; display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; border-radius: 999px;
+  color: #F6F4EF; min-width: 230px; max-width: 100%; background: rgba(27,26,24,.96); box-shadow: var(--shadow-float); animation: timerIn .55s var(--spring) both;
+}
+.timer .t-prog { position: absolute; inset: 0; background: rgba(255,255,255,.12); transform-origin: left center; transform: scaleX(0); transition: transform .3s linear; pointer-events: none; }
+.timer > *:not(.t-prog) { position: relative; }
+.timer .t-time { font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+.timer .t-label { flex: 1; min-width: 0; max-width: 160px; font-size: 13px; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timer button { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,.14); color: inherit; display: grid; place-items: center; flex: none; transition: transform .3s var(--spring), background .2s; }
+.timer button:active { transform: scale(.85); }
+.timer.paused .t-time { opacity: .5; }
+/* 終了は「注意色」:すぐ気づいてほしいが、危険ではない */
+.timer.done { background: var(--attention); color: #1B1A18; animation: timerIn .55s var(--spring) both, ring 1s ease-in-out infinite; }
+.timer.done button { background: rgba(0,0,0,.12); }
+.timer.done .t-prog { display: none; }
+.timer.out { animation: timerOut .3s var(--ease) forwards; }
+
+/* ---------- 動き(transform と opacity だけ) ---------- */
+@keyframes starPop { 0% { transform: scale(.6) rotate(-20deg); } 60% { transform: scale(1.3) rotate(8deg); } 100% { transform: none; } }
+@keyframes wiggle { 25% { transform: rotate(-12deg); } 50% { transform: rotate(10deg); } 75% { transform: rotate(-6deg); } }
+@keyframes timerIn { from { opacity: 0; transform: translateY(30px) scale(.85); } to { opacity: 1; transform: none; } }
+@keyframes timerOut { to { opacity: 0; transform: translateY(20px) scale(.85); } }
+@keyframes ring { 0%, 100% { transform: rotate(0); } 10% { transform: rotate(-3deg); } 20% { transform: rotate(3deg); } 30% { transform: rotate(-2deg); } 40% { transform: rotate(0); } }
+@keyframes pipFlash { 50% { opacity: 1; } }
+
+/* ---------- 画面の幅 ---------- */
+@media (min-width: 761px) {
+  .grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
+  .d-hero { margin-top: 16px; border-radius: var(--r-card); }
+  .d-back { left: 12px; }
+  .cook-body { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 32px; }
+  .cook-ing { position: sticky; top: calc(var(--topbar-h) + env(safe-area-inset-top, 0px) + 16px); }
+}
+@media (max-width: 640px) {
+  .card-name { font-size: 15px; }
+  .card.no-photo .card-name { font-size: 19px; }
+  .card-cap { padding: 36px 12px 12px; }
+  .card .fav { width: 30px; height: 30px; top: 8px; right: 8px; }
+  .card .fav svg { width: 16px; height: 16px; }
+  .badge-play { left: 8px; top: 8px; }
+  .c-steps li { font-size: 18px; padding: 16px 14px 16px 58px; }
+  .c-steps .num { left: 12px; top: 16px; }
+  .timer { min-width: 0; }
+}

@@ -1,0 +1,71 @@
+/* =========================================================
+   ボックス(共有)— sharing.js
+   切り替えメニューは base.css の .menu。ここは「ボックスと共有」の中身・コードで参加・招待コードのシート
+   退出と外すは取り消せないので危険色(2段階)。招待コードは数字と文字が読み取りやすいよう等幅で字間を広く
+   ========================================================= */
+/* ログインしていないときの案内 */
+.share-locked { display: grid; justify-items: center; gap: 8px; padding: 28px 16px; border-radius: 16px; background: var(--sunken); text-align: center; }
+.share-locked-icon { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--fill); color: var(--ink-2); }
+.share-locked-icon svg { width: 26px; height: 26px; }
+.share-locked b { font-size: 17px; }
+.share-locked p { max-width: 28em; font-size: 14px; color: var(--ink-2); }
+.share-locked .btn { margin-top: 8px; }
+
+/* 「ボックスと共有」 */
+.box-panel { display: grid; gap: 28px; }
+.box-notice { padding: 12px 14px; border-radius: 14px; background: var(--danger-tint); font-size: 13px; line-height: 1.5; word-break: break-word; }
+.box-card { display: grid; gap: 4px; padding: 18px 18px 16px; border-radius: 16px; background: var(--sunken); }
+.box-card-name { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.25; word-break: break-word; }
+.box-card-owner { font-size: 13px; color: var(--ink-2); }
+.box-name-form { margin-top: 12px; display: grid; gap: 8px; }
+.box-name-form .lbl { margin: 0 2px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.box-name-form .add-row input { background: var(--surface); }
+.box-name-form .hint { margin: 0 2px; }
+.box-leave { margin-top: 12px; display: grid; gap: 10px; justify-items: start; }
+.box-leave .hint { margin: 0 2px; }
+.box-leave .btn.danger { background: var(--danger-tint); }
+.box-leave .btn.danger.confirm { background: var(--danger); color: #fff; }
+.sec-count { font-size: 13px; color: var(--ink-2); }
+
+/* メンバー */
+.member-list > li { padding: 10px 12px 10px 14px; }
+.mb-text { flex: 1; min-width: 0; display: grid; }
+.mb-text b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mb-text span { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mb-tag { flex: none; padding: 2px 8px; border-radius: 999px; background: var(--fill); font-size: 11px; font-weight: 700; color: var(--ink-2); }
+.mb-remove {
+  flex: none; height: 32px; padding: 0 12px; border-radius: 999px; background: var(--danger-tint); color: var(--danger);
+  font-size: 13px; font-weight: 700; white-space: nowrap; transition: background .25s, color .25s, transform .35s var(--spring);
+}
+.mb-remove:active { transform: scale(.92); }
+.mb-remove.confirm { background: var(--danger); color: #fff; }
+.mb-remove:disabled { opacity: .5; }
+
+/* 招待コードの一覧 */
+.invite-list > li { padding: 6px 10px 6px 16px; }
+.iv-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 6px 0; text-align: left; color: var(--ink); }
+.iv-code, .invite-code b, .join-input { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+.iv-code { font-size: 17px; font-weight: 700; letter-spacing: .18em; }
+.iv-exp { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.iv-del { flex: none; }
+
+/* 招待コードのシート */
+.invite-code { display: grid; justify-items: center; gap: 4px; padding: 22px 16px; border-radius: 16px; background: var(--sunken); }
+.invite-code b { font-size: 34px; font-weight: 700; letter-spacing: .22em; margin-right: -.22em; user-select: all; }
+.invite-code span { font-size: 13px; color: var(--ink-2); }
+.invite-actions { display: flex; gap: 10px; }
+.invite-actions .btn { flex: 1; }
+
+/* コードで参加のシート */
+.join-form { display: grid; gap: 16px; }
+.join-form > .hint { margin: 0 2px; }
+.join-form .lbl { display: block; margin: 0 0 8px 2px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.join-input {
+  width: 100%; border: 0; outline: 0; background: var(--sunken); border-radius: var(--r-input); padding: 14px; text-align: center;
+  font-size: 26px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; -webkit-appearance: none; appearance: none;
+  transition: box-shadow .3s var(--ease);
+}
+.join-input:focus { box-shadow: 0 0 0 2px var(--action); }
+.join-input::placeholder { color: var(--ink-3); font-weight: 500; }
+.join-input.invalid { animation: shake .45s; box-shadow: 0 0 0 2px var(--danger); }
+.join-error { margin: -6px 2px 0; font-size: 13px; color: var(--danger); }

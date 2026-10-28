@@ -1,0 +1,46 @@
+/* =========================================================
+   食材から探す(シート)— fridge.js
+   入れた食材は「選択状態」なのでインクの反転。足りないものは文字の太さで、そろったものだけ成功色
+   ========================================================= */
+#fridge .sheet { max-width: 600px; }
+
+/* 入力中の候補・よく使う食材(ワンタップで入れるチップ) */
+.fridge-suggest, .fridge-quick-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.fridge-suggest { margin-top: -6px; }
+.add-chip {
+  display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 7px 14px 7px 10px; border-radius: 999px;
+  background: var(--sunken); color: var(--ink); font-size: 14px; font-weight: 500;
+  transition: transform .35s var(--spring), background .2s;
+}
+.add-chip svg { width: 14px; height: 14px; color: var(--action); }
+.add-chip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.add-chip:hover { background: var(--fill); }
+.add-chip:active { transform: scale(.94); }
+.fridge-quick { gap: 10px; }
+.fridge-quick .hint { margin: 0; }
+
+/* 入れた食材 */
+.fridge-chips li { background: var(--selected-bg); color: var(--selected-fg); }
+.fridge-chips li button { color: inherit; opacity: .7; }
+.fridge-chips li button:hover { background: rgba(127,127,127,.3); color: inherit; opacity: 1; }
+
+/* 結果 */
+.fridge-results-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 20px; margin-bottom: -6px; }
+.fridge-results-head h3 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fridge-results-head .link { flex: none; }
+.fridge-results { display: grid; gap: 10px; }
+.fridge-results.animate .fr-item { animation: rise .45s var(--ease) both; animation-delay: calc(var(--i) * 30ms); }
+.fr-item { border-radius: 16px; background: var(--sunken); padding: 4px; }
+.fr-main { width: 100%; display: flex; align-items: center; gap: 12px; padding: 8px; text-align: left; border-radius: 12px; transition: background .2s; }
+.fr-main:hover { background: var(--fill); }
+.fr-thumb { width: 52px; height: 52px; flex: none; border-radius: 12px; overflow: hidden; background: var(--fill); display: grid; place-items: center; font-size: 22px; }
+.fr-thumb img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .4s var(--ease); }
+.fr-thumb img.loaded { opacity: 1; }
+.fr-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.fr-text b { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fr-missing { font-size: 14px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-missing em { font-style: normal; font-weight: 700; margin-right: 6px; }
+.fr-ready { font-size: 14px; font-weight: 700; color: var(--success); }
+.fr-used { font-size: 12px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-add { margin: 0 0 6px 72px; }
+.fridge-empty { padding: 20px 8px 8px; text-align: center; color: var(--ink-2); font-size: 14px; }

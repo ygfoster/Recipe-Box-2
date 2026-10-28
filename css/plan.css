@@ -1,0 +1,144 @@
+/* =========================================================
+   献立・レシピ選択・1品・献立に追加・今日の献立(v1 の style.css から移植、v2 のトークンに合わせた)
+   面はすべて --surface + 1px の線(影は付けない)。動きは transform と opacity だけ
+   ========================================================= */
+
+/* ---------- 今日の献立(ホームのいちばん上) ---------- */
+.today { margin: 6px 0 18px; padding: 14px 14px 10px; border-radius: var(--r-card); background: var(--surface); box-shadow: 0 0 0 1px var(--line); animation: rise .5s var(--ease) both; }
+.today-head { display: flex; align-items: baseline; gap: 8px; margin: 0 4px 6px; }
+.today-head h2 { font-size: 17px; }
+.today-date { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.today-item { width: 100%; display: flex; align-items: center; gap: 12px; padding: 6px 4px; border-radius: 14px; text-align: left; color: var(--ink); transition: background .2s; }
+.today-item:hover { background: var(--fill); }
+.today-item:active { background: var(--fill); }
+.today-thumb { width: 52px; height: 52px; flex: none; border-radius: 12px; overflow: hidden; background: var(--fill); display: grid; place-items: center; font-size: 22px; }
+.today-thumb img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .3s var(--ease); }
+.today-thumb img.loaded { opacity: 1; }
+.today-text { flex: 1; min-width: 0; display: grid; }
+.today-text b { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.today-text span { font-size: 13px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.today-chev { flex: none; display: grid; color: var(--ink-3); }
+.today-empty { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 4px 4px; font-size: 15px; color: var(--ink-2); text-align: left; }
+.today-empty-text { min-width: 0; }
+/* 「献立を決める」は押せるものなので操作色 */
+.today-go { flex: none; display: inline-flex; align-items: center; gap: 2px; color: var(--action); font-weight: 600; white-space: nowrap; }
+
+/* ---------- 献立タブ ---------- */
+.plan-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 0 16px; }
+.plan-head h1 { font-size: 26px; letter-spacing: -.02em; }
+/* まとめ:品数・材料の点数・期間・買い物リストを作る */
+.plan-summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; padding: 16px 16px 16px 20px;
+  border-radius: var(--r-card); background: var(--surface); box-shadow: 0 0 0 1px var(--line);
+}
+.ps-text { display: grid; min-width: 0; }
+.ps-text b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-text span { font-size: 13px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-summary .btn { flex: none; padding: 11px 18px; font-size: 15px; }
+/* 日付カード */
+.plan-days { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.plan-days.animate .plan-day { animation: rise .55s var(--ease) both; animation-delay: calc(var(--i) * 45ms); }
+.plan-day { min-width: 0; padding: 14px 16px 8px; border-radius: var(--r-card); background: var(--surface); box-shadow: 0 0 0 1px var(--line); }
+.pd-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.pd-date { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+.pd-rel { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--selected-bg); color: var(--selected-fg); }
+.plan-meal { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.plan-meal:first-of-type { border-top: 0; }
+.plan-meal-label { flex: none; width: 22px; padding-top: 7px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.plan-meal-dishes { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.plan-dish {
+  display: inline-flex; align-items: center; gap: 8px; max-width: 100%; height: 36px; padding: 0 12px 0 4px; border-radius: 999px;
+  background: var(--sunken); color: var(--ink); font-size: 14px; font-weight: 600; transition: transform .35s var(--spring), background .2s;
+}
+.plan-dish:hover { background: var(--fill); }
+.plan-dish:active { transform: scale(.94); }
+.plan-dish.pop { animation: pop .5s var(--spring); }
+.plan-dish.missing { color: var(--ink-2); font-weight: 500; }
+.plan-dish-thumb { width: 28px; height: 28px; flex: none; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: var(--fill); font-size: 14px; }
+.plan-dish-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.plan-dish-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-dish-serv { flex: none; font-size: 12px; font-weight: 500; color: var(--ink-2); }
+/* 枠の「＋」は押せるものなので操作色 */
+.plan-meal-add {
+  width: 36px; height: 36px; flex: none; border: 1.5px dashed color-mix(in srgb, var(--action) 45%, transparent); border-radius: 50%;
+  color: var(--action); display: grid; place-items: center; transition: transform .35s var(--spring), background .2s;
+}
+.plan-meal-add:hover { background: var(--action-tint); }
+.plan-meal-add:active { transform: scale(.85); }
+
+/* ---------- 共通:人数の行(1品・献立に追加) ---------- */
+.plan-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: var(--r-input); background: var(--sunken); font-size: 15px; font-weight: 600; }
+.plan-line .stepper { background: var(--fill); }
+
+/* ---------- レシピを選ぶ(シート) ---------- */
+.pick-tools { display: grid; gap: 10px; }
+.pick-search { position: relative; }
+.pick-search > svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-2); pointer-events: none; }
+.pick-search input {
+  width: 100%; border: 0; outline: 0; border-radius: var(--r-input); background: var(--sunken); padding: 11px 12px 11px 38px; font-size: 16px;
+  -webkit-appearance: none; appearance: none; transition: box-shadow .3s var(--ease);
+}
+.pick-search input:focus { box-shadow: 0 0 0 2px var(--action); }
+.pick-search input::placeholder { color: var(--ink-3); }
+.pick-chips { padding: 2px 0; }
+.pick-chips .chip { padding: 6px 14px; font-size: 14px; box-shadow: none; background: var(--sunken); }
+.pick-chips .chip.active { background: var(--selected-bg); color: var(--selected-fg); }
+.pick-list { max-height: min(52vh, 460px); margin: 0 -8px; padding: 0 0 4px; overflow-y: auto; overscroll-behavior: contain; }
+.pick-list.animate li { animation: rise .4s var(--ease) both; animation-delay: calc(var(--i) * 25ms); }
+.pick-item { width: 100%; display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 14px; text-align: left; color: var(--ink); transition: background .2s; }
+.pick-item:hover { background: var(--fill); }
+.pick-thumb { width: 52px; height: 52px; flex: none; border-radius: 12px; overflow: hidden; background: var(--fill); display: grid; place-items: center; font-size: 22px; }
+.pick-thumb img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .3s var(--ease); }
+.pick-thumb img.loaded { opacity: 1; }
+.pick-text { flex: 1; min-width: 0; display: grid; }
+.pick-text b { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pick-text span { font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 「＋」は操作色、入れたら選択状態(インク反転) */
+.pick-check {
+  width: 32px; height: 32px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--action-tint); color: var(--action);
+  transition: background .3s var(--ease), color .3s var(--ease), transform .4s var(--spring);
+}
+.pick-check svg { width: 16px; height: 16px; }
+.pick-item.added .pick-check { background: var(--selected-bg); color: var(--selected-fg); transform: scale(1.08); }
+.pick-empty { padding: 20px 0; text-align: center; color: var(--ink-2); font-size: 14px; }
+.pick-foot { padding-top: 4px; }
+
+/* ---------- 献立の1品(シート) ---------- */
+/* 長い料理名は題名を2行で省略する(1品・献立に追加) */
+#plan-entry .sheet-title, #plan-slot .sheet-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.entry-recipe { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.entry-thumb { width: 56px; height: 56px; flex: none; border-radius: 14px; overflow: hidden; background: var(--fill); display: grid; place-items: center; font-size: 24px; }
+.entry-thumb img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .3s var(--ease); }
+.entry-thumb img.loaded { opacity: 1; }
+.entry-meta { flex: 1; min-width: 0; font-size: 14px; color: var(--ink-2); line-height: 1.45; word-break: break-word; }
+.entry-actions { display: flex; gap: 10px; }
+.entry-actions .btn { flex: 1; min-width: 0; padding-left: 12px; padding-right: 12px; }
+
+/* ---------- レシピ画面から献立に追加(シート) ---------- */
+#plan-slot .sec-h { margin-bottom: -6px; }
+.slot-days { display: flex; gap: 8px; margin: 0 -24px; padding: 2px 24px 4px; overflow-x: auto; scrollbar-width: none; }
+.slot-days::-webkit-scrollbar { display: none; }
+.slot-day {
+  position: relative; flex: none; width: 58px; padding: 8px 0; border-radius: 14px; background: var(--sunken); color: var(--ink);
+  display: grid; justify-items: center; gap: 2px; transition: background .3s var(--ease), color .3s var(--ease), transform .35s var(--spring);
+}
+.slot-day:active { transform: scale(.92); }
+.sd-top { font-size: 11px; font-weight: 600; color: var(--ink-2); }
+.slot-day b { font-size: 16px; }
+.sd-dot { position: absolute; top: 6px; right: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); }
+.slot-day.active { background: var(--selected-bg); color: var(--selected-fg); }
+.slot-day.active .sd-top { color: inherit; opacity: .7; }
+.slot-day.active .sd-dot { background: var(--selected-fg); opacity: .6; }
+.slot-note { margin: -4px 2px 0; min-height: 1.4em; font-size: 13px; color: var(--ink-2); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+/* 同じ料理がすでに入っているときは注意色 */
+.slot-note.warn { color: var(--attention-ink); font-weight: 600; }
+
+@media (max-width: 640px) {
+  .plan-days { grid-template-columns: 1fr; }
+  /* スマホでは期間が切れないよう2段に:上に品数と期間、下に幅いっぱいのボタン(親指で押しやすい) */
+  .plan-summary { flex-wrap: wrap; gap: 12px; padding: 14px 16px 16px; }
+  .ps-text { flex: 1 1 100%; }
+  .plan-summary .btn { width: 100%; }
+  .pick-list { max-height: 58vh; }
+  .slot-days { margin: 0 -20px; padding: 2px 20px 4px; }
+}
