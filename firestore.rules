@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function isMember(uid) {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(uid)/members/$(request.auth.uid));
+    }
+    function canUse(uid) { return isOwner(uid) || isMember(uid); }
+    function invite(code) { return get(/databases/$(database)/documents/invites/$(code)).data; }
+
+    // レシピ・献立・買い物・設定:本人とメンバーが読み書きできる
+    match /users/{uid}/recipes/{id}  { allow read, write: if canUse(uid); }
+    match /users/{uid}/plan/{id}     { allow read, write: if canUse(uid); }
+    match /users/{uid}/shopping/{id} { allow read, write: if canUse(uid); }
+    match /users/{uid}/meta/settings { allow read, write: if canUse(uid); }
+    // 参加しているボックスの一覧など、本人だけのもの
+    match /users/{uid}/meta/{doc}    { allow read, write: if isOwner(uid); }
+
+    // メンバー:一覧は本人とメンバーが見られる。参加は有効な招待コードがあるときだけ自分自身を追加できる
+    match /users/{uid}/members/{memberId} {
+      allow read: if canUse(uid);
+      allow create: if signedIn() && request.auth.uid == memberId && memberId != uid
+        && request.resource.data.code is string
+        && invite(request.resource.data.code).ownerUid == uid
+        && invite(request.resource.data.code).expiresAt > request.time.toMillis();
+      allow delete: if isOwner(uid) || (signedIn() && request.auth.uid == memberId);
+    }
+
+    // 招待コード:作った本人だけが作成・削除できる。参加する人は読める
+    match /invites/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+  }
+}
