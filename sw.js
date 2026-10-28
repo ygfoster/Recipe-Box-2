@@ -1,10 +1,10 @@
 // オフラインでも開けるように、アプリ本体をキャッシュする(v1 と同じ方針。キャッシュ名だけ分ける)
-const CACHE = 'rb2-v3';
+const CACHE = 'rb2-v4';
 const SHELL = [
   './', './index.html', './firebase-config.js', './manifest.webmanifest',
   './css/base.css', './css/recipes.css', './css/plan.css', './css/shop.css', './css/fridge.css', './css/settings.css', './css/sharing.css',
   './js/app.js', './js/store.js', './js/cloud.js', './js/ui.js',
-  './js/lib/text.js', './js/lib/model.js', './js/lib/idb.js', './js/lib/ingredients.js', './js/lib/video.js', './js/lib/image.js', './js/lib/search.js',
+  './js/lib/text.js', './js/lib/model.js', './js/lib/idb.js', './js/lib/ingredients.js', './js/lib/video.js', './js/lib/ai.js', './js/lib/image.js', './js/lib/search.js',
   './js/recipes.js', './js/recipe-detail.js', './js/recipe-form.js', './js/cook.js', './js/timers.js', './js/pip.js',
   './js/plan.js', './js/today.js', './js/shop.js', './js/fridge.js', './js/settings.js', './js/sharing.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/icon.svg',

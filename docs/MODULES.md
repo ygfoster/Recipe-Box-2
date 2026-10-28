@@ -352,3 +352,16 @@ YouTube の埋め込みは `https://www.youtube.com/embed/{id}?autoplay=1&playsi
 - Google ログインはできないので「ログインせずに使う」。クラウドは §1.5 の偽クラウドで(メモリ上の `users[uid]` と `invites` を持ち、`watch*` は登録時に全件を `added` で流し、`put/del/batch` は同じ `uid`・コレクションの購読者に `modified/removed` を流せば、ログイン → 移行 → ボックス名 → 招待 → 参加 → 切り替え → 外す/退出 → ログアウトまで通る。外された側は購読者の `onError({ code:'permission-denied' })` を呼べば再現できる)
 - Pixel 幅 412×915 とダークモードで、長い料理名・写真なし・0件でも崩れないこと
 - 確認用ペインの癖:ペインが表示されていないと rAF と CSS の transition が進まない。`ui.open` の `.open` はスクリーンショットを1枚挟むと付く(付く前のページは `translate(100%)` のままなので、その中のボタンは押せない)。`resize_window` の 412×915 エミュレーションは計測(`getBoundingClientRect` / `scrollWidth`)には使えるが、ペインが非表示のときはスクリーンショットが撮れない。ダークの計算済みスタイルは transition を切ってから読む(`* { transition: none !important }` を一時的に足す)
+
+## 6. AI で動画からレシピを読み取る(`lib/ai.js`)
+
+Gemini API(REST、ブラウザから直接)に YouTube の URL を渡して、動画の中身から料理名・材料・作り方・人数・時間・タグ・メモを JSON で返してもらう。キーは `firebase-config.js` の `RB2_GEMINI_API_KEY`(`null` なら機能ごと出ない)、モデルは `RB2_GEMINI_MODEL`(既定 `gemini-3.1-flash-lite`)。
+
+| export | 役割 |
+|---|---|
+| `hasAi()` | キーがあるか。false なら登録画面に AI の表示を一切出さない |
+| `extractRecipeFromVideo({ url, title }, { signal })` | 読み取って正規化済みの `{ name, servings, timeMinutes, ingredients:[{ name, amount, group }], steps:[{ text, startSec }], tags, notes, confidence }` を返す。120 秒で打ち切り。失敗は `Error` に `code`:`no-key` `quota`(429)`unsupported`(限定公開・長すぎ・非対応)`network` `timeout` `bad-response` |
+| `extractToText(r)` | 登録画面のテキスト形式へ(`{ ingredients, steps }`。材料は `名前 分量`、グループは `【タレ】` の行、手順は `m:ss ` の頭出し付き) |
+| `aiErrorText(e)` | `code` に応じた日本語の案内文 |
+
+`recipe-form.js` の流れ:動画 URL のプレビューでタイトルを取ったあと、`hasAi()` なら `mountAi(...)`。材料・作り方が空(かつ概要欄から入っていない)なら自動で読み取りを始め、そうでなければ「AI で動画から材料・作り方を読み取る」ボタン。結果は `#ai-preview` のシートで見せ、「この内容で入れる」で `applyAi(r)`(料理名は空か動画タイトルの自動入力のままのときだけ置き換え、材料・作り方は置き換え、タグは合流、メモは空のときだけ)。URL を変えると進行中の呼び出しは `AbortController` で止める。「読み取り結果をもう一度見る」で同じ結果をもう一度開ける。

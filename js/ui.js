@@ -4,6 +4,7 @@ import { el, replay, emitter } from './lib/text.js';
 
 /* ---------------- 共通アイコン(SVG 文字列) ---------------- */
 export const ICON = {
+  sparkle: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" fill="currentColor"/></svg>',
   // 三角形の重心((左辺x×2 + 先端x) / 3)が中心の 12 に来る形
   play: '<svg viewBox="0 0 24 24"><path d="M7.75 5.4v13.2a1 1 0 0 0 1.52.85l10.73-6.6a1 1 0 0 0 0-1.7L9.27 4.55a1 1 0 0 0-1.52.85z" fill="currentColor"/></svg>',
   heart: '<svg viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.6 3.9 4.5 7.2 4.5c2 0 3.5 1.1 4.8 2.8 1.3-1.7 2.8-2.8 4.8-2.8 3.3 0 5.6 3.1 4.4 6.6-1.7 4.8-9.2 9.4-9.2 9.4z"/></svg>',

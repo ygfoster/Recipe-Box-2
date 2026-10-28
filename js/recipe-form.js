@@ -5,6 +5,7 @@ import { store } from './store.js';
 import * as ui from './ui.js';
 import { el, uid, replay } from './lib/text.js';
 import { videoInfo, fetchVideoTitle, fetchYouTubeDetails, descriptionToRecipe } from './lib/video.js';
+import { hasAi, extractRecipeFromVideo, extractToText, aiErrorText } from './lib/ai.js';
 import { compressImage, makeImg } from './lib/image.js';
 import { openSettings } from './settings.js';
 import { currentFilter, revealList } from './recipes.js';
@@ -19,6 +20,10 @@ let formGenre = '';
 let formCourse = '';
 let saving = false;
 let videoTimer, videoSeq = 0;
+let aiAbort = null; // 読み取り中の AI 呼び出し(URL が変わったら止める)
+let aiOv = null;    // 読み取り結果の確認シート
+let aiResult = null;
+let autoName = '';  // 動画タイトルから自動で入れた料理名(AI の料理名で置き換えてよい)
 
 /* ---------------- 部品づくり ---------------- */
 function field(labelText, input, id) {
@@ -225,26 +230,151 @@ function renderVideoPreview(autofill) {
     const filled = [];
     if (t && autofill && !F.name.value.trim()) {
       F.name.value = t.slice(0, 80);
+      autoName = F.name.value;
       replay(F.name, 'filled-flash');
       filled.push('料理名');
     }
+    let fromDescription = false;
     if (details) {
       const parsed = descriptionToRecipe(details.description);
       if (!parsed) {
-        text.append(el('span', 'vp-note', '概要欄に材料・作り方は見つかりませんでした'));
+        if (!hasAi()) text.append(el('span', 'vp-note', '概要欄に材料・作り方は見つかりませんでした'));
       } else if (autofill && !F.ing.value.trim() && !F.steps.value.trim()) {
         applyDescription(parsed);
         filled.push('材料', '作り方');
+        fromDescription = true;
       } else {
         // すでに書いてあるときは、勝手に上書きせずボタンで選べるようにする
         const b = el('button', 'link small vp-apply', '概要欄の材料・作り方で置き換える');
         b.type = 'button';
         b.onclick = () => { applyDescription(parsed); b.remove(); ui.toast('概要欄の材料と作り方に置き換えました'); };
         text.append(b);
+        fromDescription = true;
       }
     }
     if (filled.length) ui.toast(`動画から${filled.join('・')}を入れました。内容を確認してください`);
+    // AI(Gemini)で動画の中身を読む。材料・作り方が空のときは自動で始め、そうでなければボタンで
+    if (hasAi()) {
+      const auto = autofill && !fromDescription && !F.ing.value.trim() && !F.steps.value.trim();
+      mountAi(text, v, t || '', seq, auto);
+    }
   });
+}
+
+/* ---------------- AI(Gemini)で動画からレシピを読み取る ---------------- */
+function mountAi(text, v, title, seq, auto) {
+  const box = el('div', 'ai-box');
+  text.append(box);
+  const idle = () => {
+    box.innerHTML = '';
+    const b = el('button', 'ai-btn');
+    b.type = 'button';
+    b.innerHTML = ui.ICON.sparkle + 'AI で動画から材料・作り方を読み取る';
+    b.onclick = () => run();
+    box.append(b);
+  };
+  const run = async () => {
+    if (aiAbort) aiAbort.abort();
+    aiAbort = new AbortController();
+    box.innerHTML = '';
+    const st = el('span', 'ai-status');
+    st.innerHTML = '<span class="ai-dots" aria-hidden="true"><i></i><i></i><i></i></span>AI が動画を読み取っています(10〜40秒)…';
+    box.append(st);
+    try {
+      const r = await extractRecipeFromVideo({ url: v.url, title }, { signal: aiAbort.signal });
+      if (seq !== videoSeq) return;
+      box.innerHTML = '';
+      const again = el('button', 'link small', '読み取り結果をもう一度見る');
+      again.type = 'button';
+      again.onclick = () => openAiPreview(r);
+      box.append(el('span', 'ai-done', '読み取れました'), again);
+      openAiPreview(r);
+    } catch (e) {
+      if (seq !== videoSeq || (e && e.code === 'timeout' && aiAbort && aiAbort.signal.aborted && !ui.isOpen(ov))) return;
+      box.innerHTML = '';
+      box.append(el('span', 'ai-error', aiErrorText(e)));
+      const retry = el('button', 'link small', 'もう一度');
+      retry.type = 'button';
+      retry.onclick = () => run();
+      box.append(retry);
+    }
+  };
+  if (auto) run(); else idle();
+}
+
+function openAiPreview(r) {
+  aiResult = r;
+  if (!aiOv) {
+    aiOv = ui.sheet({ id: 'ai-preview', eyebrow: 'AI の読み取り結果', build: buildAiPreview });
+  }
+  renderAiPreview(r);
+  ui.open(aiOv);
+}
+
+const A = {};
+function buildAiPreview(body) {
+  A.warn = el('p', 'ai-warn');
+  A.meta = el('p', 'ai-meta');
+  A.ing = el('ul', 'ai-list');
+  A.steps = el('ol', 'ai-list ai-steps');
+  A.tags = el('p', 'ai-tags');
+  A.notes = el('p', 'ai-notes');
+  const foot = el('div', 'ai-foot');
+  const cancel = el('button', 'btn ghost', 'やめる');
+  cancel.type = 'button';
+  cancel.onclick = () => ui.close(aiOv);
+  const apply = el('button', 'btn primary', 'この内容で入れる');
+  apply.type = 'button';
+  apply.onclick = () => { applyAi(aiResult); ui.close(aiOv); };
+  foot.append(cancel, apply);
+  body.append(A.warn, A.meta, el('h4', 'ai-h', '材料'), A.ing, el('h4', 'ai-h', '作り方'), A.steps, A.tags, A.notes,
+    el('p', 'hint', '読み取りは AI なので間違うことがあります。入れたあとで直せます。'), foot);
+}
+
+function renderAiPreview(r) {
+  aiOv.setTitle(r.name || '(料理名が読み取れませんでした)');
+  A.warn.hidden = r.confidence !== 'low';
+  A.warn.textContent = '料理のレシピ動画ではないかもしれません。内容をよく確認してください。';
+  A.meta.textContent = [r.servings ? `${r.servings}人分` : '', r.timeMinutes ? `${r.timeMinutes}分` : ''].filter(Boolean).join(' · ') || '人数・時間は読み取れませんでした';
+  A.ing.innerHTML = '';
+  let group = '';
+  if (!r.ingredients.length) A.ing.append(el('li', 'ai-empty', '読み取れませんでした'));
+  r.ingredients.forEach((x) => {
+    if (x.group && x.group !== group) { group = x.group; A.ing.append(el('li', 'ai-group', group)); }
+    const li = el('li');
+    li.append(el('span', null, x.name), el('span', 'ai-amt', x.amount || '—'));
+    A.ing.append(li);
+  });
+  A.steps.innerHTML = '';
+  if (!r.steps.length) A.steps.append(el('li', 'ai-empty', '読み取れませんでした'));
+  r.steps.forEach((x) => {
+    const li = el('li');
+    if (x.startSec >= 0) li.append(el('span', 'ai-time', `${Math.floor(x.startSec / 60)}:${String(x.startSec % 60).padStart(2, '0')}`));
+    li.append(el('span', null, x.text));
+    A.steps.append(li);
+  });
+  A.tags.hidden = !r.tags.length;
+  A.tags.textContent = r.tags.map((t) => `#${t}`).join('  ');
+  A.notes.hidden = !r.notes;
+  A.notes.textContent = r.notes;
+}
+
+// 読み取った内容を登録画面に入れる(料理名は空か動画タイトルのままのときだけ。材料・作り方は置き換え)
+function applyAi(r) {
+  if (!r) return;
+  const t = extractToText(r);
+  const curName = F.name.value.trim();
+  if (r.name && (!curName || curName === autoName)) { F.name.value = r.name; autoName = ''; replay(F.name, 'filled-flash'); }
+  if (t.ingredients) { F.ing.value = t.ingredients; autoGrow(F.ing); replay(F.ing, 'filled-flash'); }
+  if (t.steps) { F.steps.value = t.steps; autoGrow(F.steps); replay(F.steps, 'filled-flash'); }
+  if (r.servings) F.serv.value = r.servings;
+  if (r.timeMinutes) F.time.value = r.timeMinutes;
+  if (r.tags.length) {
+    const cur = F.tags.value.split(/[\s\u3000]+/).filter(Boolean);
+    F.tags.value = [...new Set([...cur, ...r.tags])].join(' ');
+  }
+  if (r.notes && !F.memo.value.trim()) { F.memo.value = r.notes; autoGrow(F.memo); }
+  ui.toast('AI の読み取り結果を入れました。内容を確認してください');
 }
 
 function applyDescription(p) {
@@ -299,6 +429,7 @@ export function init() {
   F.form.querySelectorAll('textarea').forEach((t) => t.addEventListener('input', () => autoGrow(t)));
   F.video.addEventListener('input', () => {
     clearTimeout(videoTimer);
+    if (aiAbort) { aiAbort.abort(); aiAbort = null; }
     videoTimer = setTimeout(() => renderVideoPreview(true), 350);
   });
   F.photoInput.addEventListener('change', () => { handleFile(F.photoInput.files[0]); F.photoInput.value = ''; });
@@ -321,6 +452,7 @@ export function openForm(id = null, preset = {}) {
   ov.setTitle(r ? 'レシピを編集' : '新しいレシピ');
   const f = currentFilter();
   F.name.value = r ? r.name : preset.name || '';
+  autoName = '';
   F.video.value = r ? r.videoUrl : preset.videoUrl || '';
   formGenre = r ? r.genre : (f.genre !== 'all' ? f.genre : '');
   formCourse = r ? r.course : (f.course !== 'all' ? f.course : '');

@@ -12,6 +12,7 @@
 - 写真が主役のレシピカード。検索と予測変換(かな/カナ・全角/半角を吸収、`#タグ`)、ジャンル1行+絞り込み(種類・調理時間・お気に入り・並び替え)
 - 詳細:人数に合わせた分量換算、★とお気に入り、作った記録、共有(テキスト)、動画の小窓(YouTube、指で好きな位置へ)、調理モード(画面オン・材料チェック・タイマー)
 - 登録:写真、動画URL(YouTube はタイトルを自動入力。API キーがあれば概要欄から材料・作り方も)、ジャンル・種類、調理時間、人数、タグ、材料、作り方、メモ
+- **AI で動画からレシピ**:YouTube の URL を貼ると Gemini が動画の中身を読んで、料理名・材料・作り方・人数・時間・タグを下書き。確認してから入れる(`firebase-config.js` に Gemini の API キーが必要。下の「AI の設定」)
 - 献立(日付 × 使う食事)と買い物リスト(材料を人数換算して自動合算、チェック、左スワイプで削除、共有)
 - 冷蔵庫の食材から探す(すぐ作れる → 足りないものが少ない順)
 - ゴミ箱(30日で自動削除)、設定(ジャンル・種類・よく使う食材・献立で使う食事)、バックアップ
@@ -22,6 +23,14 @@
 ## 共有を使うための設定(Firebase)
 
 Firestore のセキュリティルールを [docs/SPEC.md §5.2](docs/SPEC.md) のものに置き換える(Firebase コンソール → Firestore Database → ルール → 公開)。初代もこのルールのまま動く。
+
+## AI の設定(Gemini)
+
+1. [Google AI Studio](https://aistudio.google.com/apikey) で API キーを作る(無料枠で動く)
+2. [Google Cloud の認証情報](https://console.cloud.google.com/apis/credentials)でそのキーを開き、**アプリケーションの制限 → ウェブサイト** に `https://ygfoster.github.io/*`(と手元で試すなら `http://localhost:5174/*`)、**API の制限** に `Generative Language API` だけを許可する。公開リポジトリにキーを置くので、この制限は必須
+3. `firebase-config.js` の `RB2_GEMINI_API_KEY` に入れる。モデルは `RB2_GEMINI_MODEL` で変えられる(既定 `gemini-3.1-flash-lite`)
+
+無料枠では送った動画が Google 側の学習に使われることがある。気になる場合は Google Cloud で課金を有効にする(10分の動画1本で2〜3円ほど)。
 
 ## 初代との共存
 

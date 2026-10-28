@@ -300,6 +300,35 @@
 .vp-note { display: block; margin-top: 2px; font-size: 12px; color: var(--ink-2); }
 .vp-apply { display: block; margin-top: 4px; padding: 2px 0; }
 .video-prev.bad { color: var(--danger); background: var(--danger-tint); font-size: 13px; padding: 10px 12px; }
+
+/* AI(Gemini)の読み取り:操作色のボタン、読み取り中は点が揺れる、結果はシートで確認 */
+.ai-box { display: block; margin-top: 6px; }
+.ai-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: var(--action-tint); color: var(--action); font-size: 13px; font-weight: 600; transition: transform .35s var(--spring), background .2s; }
+.ai-btn:active { transform: scale(.95); }
+.ai-status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+.ai-dots { display: inline-flex; gap: 3px; }
+.ai-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--action); animation: aiDot 1.2s ease-in-out infinite; }
+.ai-dots i:nth-child(2) { animation-delay: .15s; }
+.ai-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes aiDot { 0%, 80%, 100% { transform: translateY(0); opacity: .4; } 40% { transform: translateY(-4px); opacity: 1; } }
+.ai-done { font-size: 13px; color: var(--success); font-weight: 600; margin-right: 8px; }
+.ai-error { display: block; font-size: 13px; color: var(--danger); margin-bottom: 2px; }
+#ai-preview .sheet-body { display: grid; gap: 10px; }
+.ai-warn { margin: 0; padding: 10px 12px; border-radius: var(--r-input); background: var(--attention-tint); color: var(--attention-ink); font-size: 13px; font-weight: 600; }
+.ai-meta { margin: 0; font-size: 14px; color: var(--ink-2); }
+.ai-h { margin: 6px 0 0; font-size: 13px; font-weight: 600; color: var(--ink-2); letter-spacing: .06em; }
+.ai-list { margin: 0; padding: 0; list-style: none; border-radius: var(--r-input); background: var(--sunken); overflow: hidden; }
+.ai-list li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 14px; font-size: 15px; border-top: 1px solid var(--line); }
+.ai-list li:first-child { border-top: 0; }
+.ai-list .ai-group { font-size: 12px; font-weight: 700; color: var(--ink-2); padding-top: 10px; padding-bottom: 2px; }
+.ai-list .ai-empty { color: var(--ink-2); justify-content: center; }
+.ai-amt { color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ai-steps li { justify-content: flex-start; align-items: flex-start; }
+.ai-time { flex: none; font-size: 12px; font-weight: 700; color: var(--action); font-variant-numeric: tabular-nums; margin-top: 3px; min-width: 34px; }
+.ai-tags { margin: 0; font-size: 14px; color: var(--action); }
+.ai-notes { margin: 0; padding: 10px 12px; border-radius: var(--r-input); background: var(--sunken); color: var(--ink-2); font-size: 14px; white-space: pre-wrap; }
+.ai-foot { display: flex; gap: 10px; margin-top: 4px; }
+.ai-foot .btn { flex: 1; }
 .save-wide { margin-top: 32px; }
 
 /* ---------- 調理モード(全画面ページ) ---------- */
