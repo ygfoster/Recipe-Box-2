@@ -50,7 +50,7 @@ index.html ─ firebase-config.js(window.RB2_FIREBASE_CONFIG / RB2_YOUTUBE_API_K
 ### 端末内の保存の名前(基盤が使っているキー。かぶらないように)
 
 - `localStorage`:`rb2:tab` `rb2:localOnly` `rb2:box` `rb2:boxNames` `rb2:settings` `rb2:migrated:<uid>`
-- 機能モジュールは `store.prefs.get/set('自分のキー')`(自動で `rb2:` が付く)。例:`rb2:sort` `rb2:fav` `rb2:time` `rb2:planDays` `rb2:lastMeal` `rb2:fridge` `rb2:fridgeSeasonOk` `rb2:pipPos`
+- 機能モジュールは `store.prefs.get/set('自分のキー')`(自動で `rb2:` が付く)。例:`rb2:sort` `rb2:fav` `rb2:time` `rb2:planDays` `rb2:lastMeal` `rb2:fridge` `rb2:fridgeSeasonOk` `rb2:pipPos` `rb2:pipSize`
 - `sessionStorage`:`rb2:intro`
 - IndexedDB:`recipe-box-2`(stores `recipes` `plan` `shopping`)。store.js 以外は触らない
 - Service Worker のキャッシュ名:`rb2-v2`(sw.js の `CACHE`。SHELL のファイルの中身を変えたら番号を上げる。ファイルを足したら SHELL にも列挙する)
@@ -335,7 +335,7 @@ YouTube の埋め込みは `https://www.youtube.com/embed/{id}?autoplay=1&playsi
 | `recipe-form.js` | `init()`、`openForm(id = null, preset = {})` | `preset = { name?, videoUrl?, memo? }`(共有メニューから。app.js が 'share' で呼ぶ)。ジャンル/種類の「編集」→ `openSettings('genres'|'courses', origin)` |
 | `cook.js` | `init()`、`openCook(id, servings)` | 調理モードのページ。Wake Lock は `onClose` で解放 |
 | `timers.js` | `init()`、`startTimer(sec, label)` | `#timers` に表示。複数同時 |
-| `pip.js` | `init()`、`openPip(recipe, t = 0, origin?)`、`closePip()` | `#pip` に小窓。同じ動画なら頭出しだけ |
+| `pip.js` | `init()`、`openPip(recipe, t = 0, origin?)`、`closePip()` | `#pip` に小窓。同じ動画なら頭出しだけ。2本指のピンチ(トラックパッドは ctrl+ホイール)で大きさを変えられ、小・大それぞれの幅を `rb2:pipSize` に保存 |
 | `plan.js` | `init()`、`openSlotPicker(recipeId, servings, origin?)` | 献立タブ(`#view-plan`)、レシピ選択・1品のシート、「献立に追加」のシート。買い物リストを作ったら `ui.goTab('shop')` |
 | `today.js` | `init()` | `#today` に今日の献立。押したら `openDetail(e.recipeId, { servings: e.servings, origin })`。無ければ「献立を決める」→ `ui.goTab('plan')` |
 | `shop.js` | `init()`、`addToShop(items)` | 買い物タブ(`#view-shop`)。`items = [{ key, name, amount, recipes?, group:'food'|'season'|'manual' }]`(`recipeNeeds` / `buildShopping` の形)。未購入の同じ key は入れず、入れた数と重複の数を toast で知らせる。戻り値 `Promise<{ added, skipped }>` |

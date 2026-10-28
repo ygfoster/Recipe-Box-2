@@ -1,6 +1,7 @@
 // 動画の小窓(PiP):YouTube を youtube.com で埋め込む(nocookie は使わない。ログイン情報が使えず広告が出るため)
 // 小さいとき:動画のどこを持っても動かせる(ゴムのような端の抵抗、離した勢いで少し滑る、画面外に出ない、位置は端末に保存)
 // 大きいとき:上のバーで動かし、YouTube の操作がそのまま使える。v1 の app.js から移植
+// 大きさ:2本指のピンチ(小さいときは動画の上、大きいときは上のバー)か、トラックパッドのピンチ(ctrl+ホイール)で自由に変えられる。小・大それぞれの幅を端末に保存
 import { store } from './store.js';
 import * as ui from './ui.js';
 import { el, replay, clamp } from './lib/text.js';
@@ -17,20 +18,38 @@ const pip = {
   big: false,
   playing: true,
   pos: null, // 画面に対する割合で覚える(回転・リサイズしても位置がずれない)
+  size: { small: 0, big: 0 }, // ピンチで決めた幅(px)。0 なら標準の大きさ
   x: 0,
   y: 0,
 };
 const PIP_BAR = 40;
 const PIP_M = 10;
+const PIP_MIN_W = 150;
 const ICON_PAUSE = '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></svg>';
 const ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M8.5 5.5v13L19 12z" fill="currentColor"/></svg>';
 const ICON_BIG = '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const ICON_SMALL = '<svg viewBox="0 0 24 24" width="14" height="14"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-function pipDims() {
+function defaultW() {
   const vw = window.innerWidth;
-  const w = Math.round(pip.big ? Math.min(vw - 2 * PIP_M, 720) : Math.max(200, Math.min(vw * 0.56, 360)));
+  return pip.big ? Math.min(vw - 2 * PIP_M, 720) : Math.max(200, Math.min(vw * 0.56, 360));
+}
+
+// 画面に収まる幅の範囲(高さも超えないように)
+function widthLimits() {
+  const byH = (window.innerHeight - 2 * PIP_M - (pip.big ? PIP_BAR : 0)) * 16 / 9;
+  return { min: PIP_MIN_W, max: Math.max(PIP_MIN_W, Math.floor(Math.min(window.innerWidth - 2 * PIP_M, byH))) };
+}
+
+function pipDims() {
+  const { min, max } = widthLimits();
+  const w = Math.round(clamp(pip.size[pip.big ? 'big' : 'small'] || defaultW(), min, max));
   return { w, h: Math.round(w * 9 / 16) + (pip.big ? PIP_BAR : 0) };
+}
+
+function setSize(w) {
+  pip.size[pip.big ? 'big' : 'small'] = Math.round(w);
+  store.prefs.set('pipSize', pip.size);
 }
 
 function pipBounds() {
@@ -139,6 +158,8 @@ function build() {
 export function init() {
   build();
   pip.pos = store.prefs.get('pipPos', null);
+  const sz = store.prefs.get('pipSize', null) || {};
+  pip.size = { small: +sz.small > 0 ? +sz.small : 0, big: +sz.big > 0 ? +sz.big : 0 };
 
   pip.inner.addEventListener('click', (e) => {
     const b = e.target.closest('[data-pip]');
@@ -155,56 +176,140 @@ export function init() {
     }
   });
 
-  // 指(またはマウス)で動かす。ほとんど動かさずに離したら「タップ」として操作ボタンを出す
+  // 指(またはマウス)で動かす・2本指で大きさを変える。ほとんど動かさずに離したら「タップ」として操作ボタンを出す
+  const fingers = new Map(); // pointerId → { x, y }
+  let g = null; // 今の操作:{ kind: 'drag' | 'pinch' | 'idle', ... }。idle はピンチのあと指が残っている間
+
+  const startDrag = () => {
+    const [p] = fingers.values();
+    g = { kind: 'drag', sx: p.x, sy: p.y, ox: pip.x, oy: pip.y, trail: [{ x: p.x, y: p.y, t: performance.now() }], b: pipBounds(), moved: false };
+  };
+  const moveDrag = (p) => {
+    const dx = p.x - g.sx, dy = p.y - g.sy;
+    if (!g.moved) {
+      if (Math.hypot(dx, dy) < 6) return;
+      g.moved = true;
+      hideCtrls();
+      pip.el.classList.add('dragging');
+      pip.el.style.transition = 'none';
+    }
+    pip.x = rubber(g.ox + dx, g.b.minX, g.b.maxX);
+    pip.y = rubber(g.oy + dy, g.b.minY, g.b.maxY);
+    pip.el.style.transform = `translate3d(${pip.x}px, ${pip.y}px, 0)`;
+    g.trail.push({ x: p.x, y: p.y, t: performance.now() });
+    if (g.trail.length > 6) g.trail.shift();
+  };
+  const endDrag = () => {
+    if (!g.moved) {
+      if (!pip.big) {
+        if (pip.el.classList.contains('ctrls')) hideCtrls(); else showCtrls();
+      }
+      return;
+    }
+    pip.el.classList.remove('dragging');
+    pip.el.style.transition = '';
+    // 指を離したときの勢いの分だけ滑らせてから止める
+    const a = g.trail[0], z = g.trail[g.trail.length - 1];
+    const dt = Math.max(16, z.t - a.t);
+    const vx = (z.x - a.x) / dt, vy = (z.y - a.y) / dt;
+    pipPlace(clamp(pip.x + vx * 140, g.b.minX, g.b.maxX), clamp(pip.y + vy * 140, g.b.minY, g.b.maxY), true);
+    pipSavePos();
+  };
+
+  // ピンチしている2本の指の距離と真ん中
+  const two = () => {
+    const a = fingers.get(g.ids[0]), b = fingers.get(g.ids[1]);
+    return { d: Math.hypot(b.x - a.x, b.y - a.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+  };
+  // 2本目の指が触れたら、動かすのをやめて大きさを変えるモードへ。指の真ん中を中心に拡大・縮小する
+  // 指を離すまでは transform だけで見せて(iframe を毎フレーム組み直さない)、離したときに本当の幅にする
+  const startPinch = () => {
+    pip.el.classList.remove('dragging');
+    hideCtrls();
+    const { w, h } = pipDims();
+    g = { kind: 'pinch', ids: [...fingers.keys()].slice(0, 2), x0: pip.x, y0: pip.y, w0: w, h0: h, ...widthLimits() };
+    const { d, mx, my } = two();
+    Object.assign(g, { d0: Math.max(1, d), mx0: mx, my0: my });
+    pip.el.classList.add('pinching');
+    pip.el.style.transition = 'none';
+    pip.inner.style.transition = 'none';
+    pip.inner.style.transformOrigin = `${mx - pip.x}px ${my - pip.y}px`;
+  };
+  const movePinch = () => {
+    const { d, mx, my } = two();
+    const lo = g.min / g.w0, hi = g.max / g.w0;
+    let s = d / g.d0;
+    // 限界を超えたらゴムのように少しだけついてくる
+    s = s < lo ? lo - (lo - s) * 0.3 : s > hi ? hi + (s - hi) * 0.3 : s;
+    pip.inner.style.transform = `scale(${s})`;
+    pip.el.style.transform = `translate3d(${g.x0 + mx - g.mx0}px, ${g.y0 + my - g.my0}px, 0)`;
+  };
+  const endPinch = () => {
+    const r = pip.inner.getBoundingClientRect();
+    pip.el.classList.remove('pinching');
+    pip.inner.style.transform = '';
+    pip.inner.style.transformOrigin = '';
+    pip.inner.style.transition = '';
+    setSize(clamp(r.width, g.min, g.max));
+    const { w, h } = pipDims();
+    pip.el.style.width = w + 'px';
+    // 見えていた位置・大きさから、画面に収まる位置へなめらかに
+    pipPlace(r.left, r.top, false);
+    pip.inner.animate([
+      { transformOrigin: '0 0', transform: `scale(${r.width / w}, ${r.height / h})` },
+      { transformOrigin: '0 0', transform: 'none' },
+    ], { duration: 350, easing: 'cubic-bezier(.32,.72,0,1)' });
+    const b = pipBounds();
+    pipPlace(clamp(r.left, b.minX, b.maxX), clamp(r.top, b.minY, b.maxY), true);
+    pipSavePos();
+    g = { kind: 'idle' };
+  };
+
   pip.inner.addEventListener('pointerdown', (e) => {
     if (e.button > 0 || e.target.closest('button')) return;
     const target = e.target.closest('.pip-shield, .pip-bar');
     if (!target) return;
     e.preventDefault();
-    target.setPointerCapture(e.pointerId);
-    const sx = e.clientX, sy = e.clientY, ox = pip.x, oy = pip.y;
-    const trail = [{ x: sx, y: sy, t: performance.now() }];
-    const b = pipBounds();
-    let dragging = false;
-
-    const move = (ev) => {
-      const dx = ev.clientX - sx, dy = ev.clientY - sy;
-      if (!dragging) {
-        if (Math.hypot(dx, dy) < 6) return;
-        dragging = true;
-        hideCtrls();
-        pip.el.classList.add('dragging');
-        pip.el.style.transition = 'none';
-      }
-      pip.x = rubber(ox + dx, b.minX, b.maxX);
-      pip.y = rubber(oy + dy, b.minY, b.maxY);
-      pip.el.style.transform = `translate3d(${pip.x}px, ${pip.y}px, 0)`;
-      trail.push({ x: ev.clientX, y: ev.clientY, t: performance.now() });
-      if (trail.length > 6) trail.shift();
-    };
-    const up = () => {
-      target.removeEventListener('pointermove', move);
-      target.removeEventListener('pointerup', up);
-      target.removeEventListener('pointercancel', up);
-      if (!dragging) {
-        if (!pip.big) {
-          if (pip.el.classList.contains('ctrls')) hideCtrls(); else showCtrls();
-        }
-        return;
-      }
-      pip.el.classList.remove('dragging');
-      pip.el.style.transition = '';
-      // 指を離したときの勢いの分だけ滑らせてから止める
-      const a = trail[0], z = trail[trail.length - 1];
-      const dt = Math.max(16, z.t - a.t);
-      const vx = (z.x - a.x) / dt, vy = (z.y - a.y) / dt;
-      pipPlace(clamp(pip.x + vx * 140, b.minX, b.maxX), clamp(pip.y + vy * 140, b.minY, b.maxY), true);
-      pipSavePos();
-    };
-    target.addEventListener('pointermove', move);
-    target.addEventListener('pointerup', up);
-    target.addEventListener('pointercancel', up);
+    try { target.setPointerCapture(e.pointerId); } catch { /* 合成イベントなど */ }
+    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (fingers.size === 1) startDrag();
+    else if (fingers.size === 2) startPinch();
   });
+  pip.inner.addEventListener('pointermove', (e) => {
+    const p = fingers.get(e.pointerId);
+    if (!p || !g) return;
+    p.x = e.clientX;
+    p.y = e.clientY;
+    if (g.kind === 'drag') moveDrag(p);
+    else if (g.kind === 'pinch') movePinch();
+  });
+  const lift = (e) => {
+    if (!g || !fingers.has(e.pointerId)) return;
+    if (g.kind === 'pinch') { if (g.ids.includes(e.pointerId)) endPinch(); }
+    else if (g.kind === 'drag') { endDrag(); g = { kind: 'idle' }; }
+    fingers.delete(e.pointerId);
+    if (!fingers.size) g = null;
+  };
+  pip.inner.addEventListener('pointerup', lift);
+  pip.inner.addEventListener('pointercancel', lift);
+
+  // トラックパッドのピンチ(ctrl+ホイールとして届く)でも大きさを変える。真ん中を固定して拡大・縮小
+  let wheelSave;
+  pip.el.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey || pip.el.hidden || g) return;
+    e.preventDefault();
+    const { w, h } = pipDims();
+    const { min, max } = widthLimits();
+    const nw = Math.round(clamp(w * Math.exp(-e.deltaY * 0.01), min, max));
+    if (nw === w) return;
+    setSize(nw);
+    const d = pipDims();
+    pip.el.style.width = d.w + 'px';
+    const b = pipBounds();
+    pipPlace(clamp(pip.x - (d.w - w) / 2, b.minX, b.maxX), clamp(pip.y - (d.h - h) / 2, b.minY, b.maxY), false);
+    clearTimeout(wheelSave);
+    wheelSave = setTimeout(pipSavePos, 300);
+  }, { passive: false });
 
   // YouTube から再生状態を受け取る(1=再生中, 3=読み込み中)
   window.addEventListener('message', (e) => {
