@@ -141,9 +141,20 @@
 #detail .page-body { flex: 1; display: flex; flex-direction: column; width: 100%; padding: 0; }
 /* 左上の ‹:高さ0の sticky に浮かせて、スクロールしても上に残る */
 .d-top { position: sticky; top: 0; z-index: 4; height: 0; flex: none; }
+/* 写真を過ぎたら出る料理名の帯。透明度と移動だけで出し入れする */
+.d-topbar {
+  position: absolute; left: 0; right: 0; top: 0; height: calc(52px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) 60px 0;
+  display: flex; align-items: center; justify-content: center; background: var(--surface); border-bottom: 1px solid var(--line);
+  opacity: 0; pointer-events: none; transition: opacity .25s var(--ease);
+}
+.d-top-title { min-width: 0; font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transform: translateY(6px); transition: opacity .25s var(--ease), transform .3s var(--ease); }
+.d-top.solid .d-topbar { opacity: 1; pointer-events: auto; }
+.d-top.solid .d-top-title { opacity: 1; transform: none; }
+.d-top.solid .d-back { background: var(--fill); box-shadow: none; }
 .d-back {
   position: absolute; left: 10px; top: calc(10px + env(safe-area-inset-top, 0px)); width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
-  background: color-mix(in srgb, var(--surface) 92%, transparent); color: var(--ink); box-shadow: var(--shadow-float); transition: transform .35s var(--spring);
+  background: color-mix(in srgb, var(--surface) 92%, transparent); color: var(--ink); box-shadow: var(--shadow-float);
+  transition: transform .35s var(--spring), background .25s, box-shadow .25s;
 }
 .d-back:active { transform: scale(.88); }
 .d-hero { position: relative; flex: none; aspect-ratio: 16 / 10; background: var(--sunken); overflow: hidden; display: grid; place-items: center; }

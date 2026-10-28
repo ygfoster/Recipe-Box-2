@@ -45,15 +45,25 @@ export function stepChips(r, step, inCook) {
 /* ---------------- 骨組み(作成時に1回) ---------------- */
 function build(body, o) {
   // 左上の ‹。写真の上に浮かせ、スクロールしても上に残る(高さ0の sticky)
+  // 写真が画面から消えたら、料理名の帯(d-topbar)を出して ‹ をその中に収める(中身に重ならない)
   const top = el('div', 'd-top');
+  const topbar = el('div', 'd-topbar');
+  D.topTitle = el('span', 'd-top-title');
+  topbar.append(D.topTitle);
   const back = el('button', 'd-back');
   back.type = 'button';
   back.dataset.close = '';
   back.setAttribute('aria-label', '閉じる');
   back.innerHTML = ui.ICON.back;
-  top.append(back);
+  top.append(topbar, back);
+  D.top = top;
 
   D.hero = el('div', 'd-hero');
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(([e]) => {
+      top.classList.toggle('solid', ui.isOpen(o) && !e.isIntersecting);
+    }, { root: o, rootMargin: '-52px 0px 0px 0px', threshold: 0 }).observe(D.hero);
+  }
   const main = el('div', 'd-main');
   D.pills = el('div', 'd-pills');
   const titlebar = el('div', 'd-titlebar');
@@ -305,6 +315,7 @@ function render(r) {
   renderHero(r);
   renderPills(r);
   D.title.textContent = r.name;
+  D.topTitle.textContent = r.name;
   renderFav(r);
   renderStars(r);
   renderIngredients(r);
@@ -489,6 +500,7 @@ export function openDetail(id, { servings: n, origin } = {}) {
   closeLogForm(true);
   resetDelete();
   render(r);
+  D.top.classList.remove('solid');
   if (already) { ov.scrollTop = 0; return; }
   // 大きな写真の展開が動きの途中に入るとカクつくので、先に済ませる(長くても 0.16 秒まで)
   const img = D.hero.querySelector('img');
