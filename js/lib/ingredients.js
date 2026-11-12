@@ -40,30 +40,65 @@ export function scaleAmount(amount, k) {
   });
 }
 
-// 大さじが多いときは ml も添える(大さじ3 → 45ml)。何杯も量るより計量カップで量れるように
+/* ---------------- 大さじ・小さじ ---------------- */
+// 人数を増やすと「大さじ7と1/2」「大さじ3と小さじ3」のようになって量りにくいので、
+// 小さじ3 = 大さじ1 として繰り上げ、大さじ3杯分(45ml)以上なら ml も添える(計量カップで量れるように)
 export const TBSP_ML = 15;
-export const ML_FROM = 3; // 大さじ何杯以上で ml を出すか
-const TBSP_RE = /大さじ\s*(?:(\d+)と(\d+)\/(\d+)|(\d+(?:\.\d+)?)(?:\/(\d+))?)(?!\s*[（(]?\s*[\d.]+\s*(?:ml|cc|mL))/g;
+export const TSP_ML = 5;
+export const ML_FROM = 3; // 大さじ何杯分以上で ml を出すか
+const NUM_SRC = '(?:(\\d+)と(\\d+)\\/(\\d+)|(\\d+(?:\\.\\d+)?)(?:\\/(\\d+))?)';
+const SPOON_RE = new RegExp(`(大さじ|小さじ)\\s*${NUM_SRC}`, 'g');
+const numOf = (m, i) => (m[i] ? +m[i] + +m[i + 1] / +m[i + 2] : +m[i + 3] / (m[i + 4] ? +m[i + 4] : 1));
+const prep = (s) => s.normalize('NFKC').replace(/⁄/g, '/');
 
-// '大さじ4' → '60ml'、'大さじ7と1/2' → '113ml'、'大さじ2' や 'ml 併記済み' → ''。複数あれば '・' でつなぐ
+// 大さじ T 杯 + 小さじ S 杯 を '大さじ4と小さじ1' の形に(小さじ3以上は大さじへ繰り上げ)
+export function fmtSpoons(T, S) {
+  T += Math.floor(S / 3 + 1e-9);
+  S = S - Math.floor(S / 3 + 1e-9) * 3;
+  if (S < 0.05) S = 0;
+  const parts = [];
+  if (T >= 0.05) parts.push(`大さじ${fmtNum(T)}`);
+  if (S) parts.push(`小さじ${fmtNum(S)}`);
+  return parts.join('と');
+}
+
+// '大さじ3と小さじ3' → '大さじ4'、'小さじ4' → '大さじ1と小さじ1'。繰り上げが要らなければそのまま返す
+// 大さじと小さじが並んでいる(間が「と」や空白だけ)ときだけまとめる。'大さじ1(小さじ3)' のような書き方は触らない
+export function normalizeSpoons(amount) {
+  if (!amount || !amount.includes('小さじ')) return amount;
+  const s = prep(amount);
+  const toks = [...s.matchAll(SPOON_RE)].map((m) => ({ unit: m[1], v: numOf(m, 2), start: m.index, end: m.index + m[0].length }));
+  const tsp = toks.filter((t) => t.unit === '小さじ');
+  if (tsp.length !== 1 || tsp[0].v < 3) return amount;
+  // カッコの中('大さじ1(小さじ3)')は注釈なので触らない
+  const before = s.slice(0, tsp[0].start);
+  if ((before.match(/[（(]/g) || []).length > (before.match(/[）)]/g) || []).length) return amount;
+  const i = toks.indexOf(tsp[0]);
+  const nb = [toks[i - 1], toks[i + 1]].find((t) => t && t.unit === '大さじ' && /^\s*(?:と|\+|＋|、|,)?\s*$/.test(s.slice(Math.min(t.end, tsp[0].end), Math.max(t.start, tsp[0].start))));
+  if (!nb && toks.some((t) => t.unit === '大さじ')) return amount; // 離れた大さじがある書き方は意味が読めないのでそのまま
+  const T = nb ? nb.v : 0;
+  const start = nb ? Math.min(nb.start, tsp[0].start) : tsp[0].start;
+  const end = nb ? Math.max(nb.end, tsp[0].end) : tsp[0].end;
+  return s.slice(0, start) + fmtSpoons(T, tsp[0].v) + s.slice(end);
+}
+
+// 大さじ・小さじを合計した ml。大さじ3杯分(45ml)以上のときだけ '75ml' のように返す。
+// 大さじ2以下、ml が書いてある分量('大さじ3(45ml)')は ''
 export function mlHint(amount) {
-  if (!amount || !amount.includes('大さじ')) return '';
-  const out = [];
-  for (const m of amount.normalize('NFKC').replace(/⁄/g, '/').matchAll(TBSP_RE)) {
-    const v = m[1] ? +m[1] + +m[2] / +m[3] : +m[4] / (m[5] ? +m[5] : 1);
-    if (v >= ML_FROM) out.push(`${Math.round(v * TBSP_ML)}ml`);
-  }
-  return out.join('・');
+  if (!amount || !/さじ/.test(amount) || /ml|cc|㏄/i.test(amount)) return '';
+  let ml = 0;
+  for (const m of prep(amount).matchAll(SPOON_RE)) ml += numOf(m, 2) * (m[1] === '大さじ' ? TBSP_ML : TSP_ML);
+  return ml >= ML_FROM * TBSP_ML - 1e-9 ? `${Math.round(ml)}ml` : '';
 }
 
 // レシピの材料を k 倍した行の一覧。{ header, name } または { name, amount, scaled, changed, hint }
-// hint は大さじ3以上のときの ml('45ml')。無ければ ''
+// scaled は小さじ3以上を大さじに繰り上げた表記、hint は大さじ3杯分以上のときの ml('45ml')。無ければ ''
 export function ingredientRows(r, k) {
   return lines(r.ingredients).map((l) => {
     const p = parseIngredient(l);
     if (p.header) return p;
-    const scaled = scaleAmount(p.amount, k);
-    return { ...p, scaled, changed: scaled !== p.amount, hint: mlHint(scaled) };
+    const scaled = normalizeSpoons(scaleAmount(p.amount, k));
+    return { ...p, scaled, changed: scaled !== normalizeSpoons(p.amount), hint: mlHint(scaled) };
   });
 }
 
@@ -146,12 +181,15 @@ export function parseAmount(amount, k) {
 
 // 単位ごとの量(Map)と文字の量(Set)を '2個 + 100g' のように1つの文字列にする
 export function fmtAmount(units, texts) {
-  const parts = [...units.values()].map((u) => {
-    if (!u.prefix) return `${fmtNum(u.qty)}${u.unit}`;
-    const s = `${u.unit}${fmtNum(u.qty)}`;
-    const ml = mlHint(s);
-    return ml ? `${s}(${ml})` : s;
-  });
+  const us = [...units.values()];
+  const parts = us.filter((u) => !(u.prefix && /さじ/.test(u.unit))).map((u) => (u.prefix ? `${u.unit}${fmtNum(u.qty)}` : `${fmtNum(u.qty)}${u.unit}`));
+  // 大さじと小さじはひとつにまとめる(小さじ3以上は大さじへ、大さじ3杯分以上は ml も)
+  const T = us.find((u) => u.prefix && u.unit === '大さじ'), S = us.find((u) => u.prefix && u.unit === '小さじ');
+  if (T || S) {
+    const sp = fmtSpoons(T ? T.qty : 0, S ? S.qty : 0);
+    const ml = mlHint(sp);
+    parts.push(ml ? `${sp}(${ml})` : sp);
+  }
   if (!parts.length && texts.size) parts.push([...texts].join('・'));
   return parts.join(' + ');
 }
@@ -178,13 +216,19 @@ export function buildShopping(entries, getRecipe) {
         map.set(key, it);
       }
       it.recipes.add(r.name);
+      const add = (a) => {
+        const uk = (a.prefix ? 'p:' : '') + a.unit;
+        const u = it.units.get(uk) || { unit: a.unit, prefix: a.prefix, qty: 0 };
+        u.qty += a.qty;
+        it.units.set(uk, u);
+      };
+      // '大さじ1と小さじ1' のように大さじ・小さじが並ぶ量は両方とも数える
+      const sp = [...prep(p.amount || '').replace(/[（(].*$/, '').matchAll(SPOON_RE)];
+      if (sp.length >= 2) { sp.forEach((m) => add({ qty: numOf(m, 2) * k, unit: m[1], prefix: true })); return; }
       const a = parseAmount(p.amount || '', k);
       if (!a) return;
       if (a.text) { it.texts.add(a.text); return; }
-      const uk = (a.prefix ? 'p:' : '') + a.unit;
-      const u = it.units.get(uk) || { unit: a.unit, prefix: a.prefix, qty: 0 };
-      u.qty += a.qty;
-      it.units.set(uk, u);
+      add(a);
     });
   });
   return [...map.values()].map((it) => ({
