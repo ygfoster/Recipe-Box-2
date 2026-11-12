@@ -195,6 +195,8 @@
 .ing .i-amt { color: var(--ink-2); text-align: right; white-space: nowrap; }
 /* 換算した量は色ではなく濃さと太さで示す */
 .ing .i-amt.scaled { color: var(--ink); font-weight: 700; }
+/* 大さじ3以上のときの ml 表記(大さじ4 60ml)。量より一段ひかえめに */
+.ing .i-ml, .c-ing .c-ml { margin-left: 5px; font-size: 12px; font-weight: 400; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .ing .i-amt.bump { animation: bump .45s var(--spring); }
 .ing li.i-head, .c-ing li.i-head { border-bottom: 0; padding: 16px 0 4px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
 .steps { counter-reset: s; }

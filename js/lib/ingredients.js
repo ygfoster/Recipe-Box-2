@@ -40,13 +40,30 @@ export function scaleAmount(amount, k) {
   });
 }
 
-// レシピの材料を k 倍した行の一覧。{ header, name } または { name, amount, scaled, changed }
+// 大さじが多いときは ml も添える(大さじ3 → 45ml)。何杯も量るより計量カップで量れるように
+export const TBSP_ML = 15;
+export const ML_FROM = 3; // 大さじ何杯以上で ml を出すか
+const TBSP_RE = /大さじ\s*(?:(\d+)と(\d+)\/(\d+)|(\d+(?:\.\d+)?)(?:\/(\d+))?)(?!\s*[（(]?\s*[\d.]+\s*(?:ml|cc|mL))/g;
+
+// '大さじ4' → '60ml'、'大さじ7と1/2' → '113ml'、'大さじ2' や 'ml 併記済み' → ''。複数あれば '・' でつなぐ
+export function mlHint(amount) {
+  if (!amount || !amount.includes('大さじ')) return '';
+  const out = [];
+  for (const m of amount.normalize('NFKC').replace(/⁄/g, '/').matchAll(TBSP_RE)) {
+    const v = m[1] ? +m[1] + +m[2] / +m[3] : +m[4] / (m[5] ? +m[5] : 1);
+    if (v >= ML_FROM) out.push(`${Math.round(v * TBSP_ML)}ml`);
+  }
+  return out.join('・');
+}
+
+// レシピの材料を k 倍した行の一覧。{ header, name } または { name, amount, scaled, changed, hint }
+// hint は大さじ3以上のときの ml('45ml')。無ければ ''
 export function ingredientRows(r, k) {
   return lines(r.ingredients).map((l) => {
     const p = parseIngredient(l);
     if (p.header) return p;
     const scaled = scaleAmount(p.amount, k);
-    return { ...p, scaled, changed: scaled !== p.amount };
+    return { ...p, scaled, changed: scaled !== p.amount, hint: mlHint(scaled) };
   });
 }
 
@@ -129,7 +146,12 @@ export function parseAmount(amount, k) {
 
 // 単位ごとの量(Map)と文字の量(Set)を '2個 + 100g' のように1つの文字列にする
 export function fmtAmount(units, texts) {
-  const parts = [...units.values()].map((u) => (u.prefix ? `${u.unit}${fmtNum(u.qty)}` : `${fmtNum(u.qty)}${u.unit}`));
+  const parts = [...units.values()].map((u) => {
+    if (!u.prefix) return `${fmtNum(u.qty)}${u.unit}`;
+    const s = `${u.unit}${fmtNum(u.qty)}`;
+    const ml = mlHint(s);
+    return ml ? `${s}(${ml})` : s;
+  });
   if (!parts.length && texts.size) parts.push([...texts].join('・'));
   return parts.join(' + ');
 }

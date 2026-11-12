@@ -236,6 +236,7 @@ function renderIngredients(r, bump) {
     if (row.header) li.textContent = row.name;
     else {
       const amt = el('span', 'i-amt' + (row.changed ? ' scaled' : ''), row.scaled);
+      if (row.hint) amt.append(el('small', 'i-ml', row.hint));
       if (bump && row.amount) amt.classList.add('bump');
       li.append(el('span', 'i-name', row.name), amt);
     }
@@ -340,7 +341,7 @@ function recipeText(r) {
   const ing = ingredientRows(r, k);
   if (ing.length) {
     out.push('', `【材料】${servings}人分`);
-    ing.forEach((x) => out.push(x.header ? `■ ${x.name}` : `・${x.name}${x.scaled ? ' ' + x.scaled : ''}`));
+    ing.forEach((x) => out.push(x.header ? `■ ${x.name}` : `・${x.name}${x.scaled ? ' ' + x.scaled : ''}${x.hint ? `(${x.hint})` : ''}`));
   }
   const steps = lines(r.steps).map(parseStep);
   if (steps.length) {

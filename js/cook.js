@@ -95,7 +95,9 @@ export function openCook(id, servings) {
     const key = `${i}:${row.name}`;
     const check = el('span', 'check');
     check.innerHTML = ui.ICON.check;
-    li.append(check, el('span', 'c-name', row.name), el('span', 'c-amt', row.scaled));
+    const amt = el('span', 'c-amt', row.scaled);
+    if (row.hint) amt.append(el('small', 'c-ml', row.hint));
+    li.append(check, el('span', 'c-name', row.name), amt);
     li.classList.toggle('done', chk.ing.has(key));
     li.onclick = () => {
       if (chk.ing.has(key)) chk.ing.delete(key); else chk.ing.add(key);
